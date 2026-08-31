@@ -1,12 +1,11 @@
 /**
- * Đo giá THỰC TẾ mỗi ảnh của provider.
+ * Chạy thử N ảnh THẬT để lấy số đối soát.
  *
- *   IMAGE_PROVIDER=higgsfield npm run probe:image-cost -- ./mau.jpg 5
+ *   IMAGE_PROVIDER=gemini npm run probe:image-cost -- ./mau.jpg 5
  *
- * Chạy N lần sinh ảnh thật, in ra chi phí trung bình. Nếu provider không trả về
- * chi phí trong response thì script nói thẳng là không đọc được — lúc đó phải
- * mở bảng billing của provider, chia số tiền cho số ảnh, rồi điền tay vào
- * IMAGE_COST_VND_PER_SCENE. Không có đường tắt và không được đoán.
+ * Provider trả về chi phí ước theo giá niêm yết cho từng lần gọi. Script in ra
+ * tổng, rồi nhắc mở bảng billing của Google đối chiếu — con số trên hoá đơn mới
+ * là con số để chốt tỷ lệ credit, vì nó tính cả lần gọi hỏng và thuế.
  */
 
 import { readFile } from "node:fs/promises";
@@ -29,7 +28,7 @@ async function main() {
 
   if (provider.name === "mock") {
     console.error(
-      "IMAGE_PROVIDER đang là 'mock' — số đo sẽ vô nghĩa. Đặt IMAGE_PROVIDER=higgsfield.",
+      "IMAGE_PROVIDER đang là 'mock' — số đo sẽ vô nghĩa. Đặt IMAGE_PROVIDER=gemini.",
     );
     process.exit(1);
   }
@@ -37,11 +36,14 @@ async function main() {
   const data = await readFile(path.resolve(file));
   const mime = file.endsWith(".png") ? "image/png" : "image/jpeg";
 
-  console.log(`Provider: ${provider.name} | ngành: ${industry} | ${count} lần\n`);
+  console.log(`Provider: ${provider.name} | ngành: ${industry} | ${count} ảnh\n`);
 
+  const started0 = Date.now();
   const cut = await provider.removeBackground({ data, mime });
   console.log(
-    `Tách nền: ${cut.costVnd === null ? "provider không trả về chi phí" : formatVnd(cut.costVnd)}`,
+    `Tách nền: ${((Date.now() - started0) / 1000).toFixed(1)}s — ${
+      cut.costVnd === null ? "không tính được chi phí" : formatVnd(cut.costVnd)
+    } [${cut.costSource ?? "?"}]`,
   );
 
   const scenes = allScenes(industry);
@@ -67,28 +69,34 @@ async function main() {
 
     if (out.costVnd === null) {
       unknown++;
-      console.log(`  ${i + 1}. ${scene.name} — ${seconds}s — chi phí: không đọc được`);
+      console.log(`  ${i + 1}. ${scene.name} — ${seconds}s — chi phí: không tính được`);
     } else {
       costs.push(out.costVnd);
-      console.log(`  ${i + 1}. ${scene.name} — ${seconds}s — ${formatVnd(out.costVnd)}`);
+      console.log(
+        `  ${i + 1}. ${scene.name} — ${seconds}s — ${formatVnd(out.costVnd)} [${out.costSource}]`,
+      );
     }
   }
 
   console.log("");
   if (costs.length === 0) {
-    console.log("Provider không trả về chi phí trong response.");
-    console.log("Mở bảng billing của provider, lấy số tiền đã tiêu chia cho");
-    console.log(`${count} ảnh vừa chạy, rồi điền vào .env:`);
-    console.log("  IMAGE_COST_VND_PER_SCENE=<số vnd mỗi ảnh>");
-    console.log("Sau đó chạy `npm run economics`.");
+    console.log("Không tính được chi phí lần nào. Kiểm tra lại GEMINI_IMAGE_MODEL");
+    console.log("có nằm trong IMAGE_MODELS (src/lib/pricing.ts) hay không.");
     process.exit(1);
   }
 
+  const total = costs.reduce((a, b) => a + b, 0) + (cut.costVnd ?? 0);
   const avg = costs.reduce((a, b) => a + b, 0) / costs.length;
+
   console.log(`Trung bình ${costs.length} ảnh: ${formatVnd(avg)}`);
-  if (unknown > 0) console.log(`(${unknown} lần không đọc được chi phí)`);
-  console.log(`\nĐiền vào .env:  IMAGE_COST_VND_PER_SCENE=${Math.round(avg)}`);
-  console.log("Rồi chạy: npm run economics");
+  console.log(`Tổng cả lần tách nền:     ${formatVnd(total)}`);
+  if (unknown > 0) console.log(`(${unknown} lần không tính được chi phí)`);
+
+  console.log("\nBƯỚC TIẾP THEO — đây mới là số để chốt tỷ lệ credit:");
+  console.log("  1. Mở bảng billing của Google, lấy số tiền thật của khoảng thời gian vừa chạy.");
+  console.log(`  2. Chia cho ${costs.length + 1} lần gọi ảnh.`);
+  console.log("  3. Điền vào .env:  IMAGE_COST_VND_PER_SCENE=<vnd mỗi ảnh>");
+  console.log("  4. Chạy: npm run economics");
 }
 
 main().catch((err) => {

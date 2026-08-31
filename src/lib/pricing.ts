@@ -106,26 +106,108 @@ export function claudeCostVnd(
   return usdToVnd(usd);
 }
 
+// ---------------------------------------------------------------------------
+// Giá vốn ảnh
+// ---------------------------------------------------------------------------
+
 /**
- * Giá vốn ảnh. `null` = CHƯA ĐO.
+ * Các model sinh ảnh dùng được, kèm giá NIÊM YẾT mỗi ảnh ở độ phân giải mặc định.
  *
- * Không đặt số phỏng đoán ở đây. Cách lấy số thật:
- *   1. `npm run probe:image-cost` — chạy N ảnh thật, ghi chi phí vào generations.providerCostVnd
- *   2. `npm run economics` — đọc số đo, tính biên, đề xuất tỷ lệ credit
+ * Giá niêm yết không phải giá đối soát: hoá đơn thật còn có lần gọi hỏng, lần
+ * retry, và thuế. Đây là số để tính nhẩm, không phải số để chốt sổ — xem thứ tự
+ * ưu tiên trong `imageCost()`.
+ *
+ * Đối chiếu lại bảng giá của Google trước mỗi lần đổi model.
  */
-export function measuredImageCostVnd(): number | null {
-  const raw = process.env.IMAGE_COST_VND_PER_SCENE;
-  if (!raw || raw.trim() === "") return null;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : null;
+export const IMAGE_MODELS = {
+  "gemini-3.1-flash-image-preview": {
+    label: "Gemini 3.1 Flash Image (nano banana 2)",
+    listPriceUsdPerImage: 0.067, // 1K; 512px rẻ hơn, 4K đắt hơn
+    recommended: true,
+    note: "Mặc định. Model sửa ảnh, giữ nguyên chủ thể tốt — điều kiện sống còn của ảnh sản phẩm.",
+  },
+  "gemini-3-pro-image-preview": {
+    label: "Gemini 3 Pro Image (nano banana pro)",
+    listPriceUsdPerImage: 0.134, // 1K/2K
+    recommended: false,
+    note: "Gấp đôi tiền. Chỉ bật nếu đo được là bản Flash không đủ chất cho ngành nào đó.",
+  },
+  "gemini-2.5-flash-image": {
+    label: "Gemini 2.5 Flash Image (nano banana đời đầu)",
+    listPriceUsdPerImage: 0.039,
+    recommended: false,
+    note: "Rẻ nhất nhưng họ Gemini 2.5 có lịch tắt 16/10/2026. Đừng xây lên nó.",
+  },
+} as const;
+
+export type ImageModelId = keyof typeof IMAGE_MODELS;
+
+export const DEFAULT_IMAGE_MODEL: ImageModelId = "gemini-3.1-flash-image-preview";
+
+/**
+ * Nguồn của con số giá vốn — quan trọng ngang bản thân con số.
+ *
+ *   INVOICE    số đối soát từ hoá đơn provider. Tin được.
+ *   METERED    tính từ token API trả về × đơn giá token đã cấu hình.
+ *   LIST_PRICE giá niêm yết. Dùng tạm, chưa đối soát.
+ */
+export type ImageCostSource = "INVOICE" | "METERED" | "LIST_PRICE";
+
+export type ImageCostQuote = {
+  costVnd: number | null;
+  source: ImageCostSource | null;
+};
+
+/**
+ * Giá một lần gọi sinh ảnh, theo thứ tự tin cậy giảm dần.
+ *
+ * Không có nguồn nào thì trả `null` — tuyệt đối không bịa một con số để bảng
+ * kinh tế đơn vị trông có vẻ đầy đủ.
+ */
+export function imageCost(args: {
+  model?: string;
+  outputTokens?: number | null;
+}): ImageCostQuote {
+  // 1. Số đối soát từ hoá đơn, điền tay sau khi chạy thật.
+  const invoice = envNumber("IMAGE_COST_VND_PER_SCENE");
+  if (invoice !== null && invoice > 0) {
+    return { costVnd: Math.round(invoice), source: "INVOICE" };
+  }
+
+  // 2. Đo theo token nếu đã cấu hình đơn giá token của model.
+  const perMTok = envNumber("GEMINI_IMAGE_USD_PER_MTOK");
+  if (perMTok !== null && perMTok > 0 && args.outputTokens && args.outputTokens > 0) {
+    return {
+      costVnd: Math.round(usdToVnd((args.outputTokens / 1_000_000) * perMTok)),
+      source: "METERED",
+    };
+  }
+
+  // 3. Giá niêm yết của model.
+  const model = (args.model ?? DEFAULT_IMAGE_MODEL) as ImageModelId;
+  const spec = IMAGE_MODELS[model];
+  if (spec) {
+    return {
+      costVnd: Math.round(usdToVnd(spec.listPriceUsdPerImage)),
+      source: "LIST_PRICE",
+    };
+  }
+
+  return { costVnd: null, source: null };
 }
 
-export function measuredBgRemovalCostVnd(): number | null {
-  const raw = process.env.BG_REMOVAL_COST_VND;
+function envNumber(key: string): number | null {
+  const raw = process.env[key];
   if (!raw || raw.trim() === "") return null;
   const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  return Number.isFinite(n) ? n : null;
 }
+
+/**
+ * Số lần gọi sinh ảnh cho một sản phẩm chạy trọn bộ: 1 lần tách nền (cache lại,
+ * chỉ chạy một lần cho mỗi sản phẩm) + 1 lần cho mỗi bối cảnh.
+ */
+export const IMAGE_CALLS_PER_PRODUCT = 1 + PHOTO_SCENES_PER_PRODUCT;
 
 // ---------------------------------------------------------------------------
 // Biên lợi nhuận

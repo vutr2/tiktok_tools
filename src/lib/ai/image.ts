@@ -1,24 +1,32 @@
 /**
  * Sinh ảnh: tách nền + ghép bối cảnh.
  *
- * ⚠️ TRƯỚC KHI BẬT PROVIDER THẬT
- * Đường dẫn endpoint và tên field của Higgsfield để trong env chứ không hardcode,
- * vì phải mở tài liệu của họ đối chiếu lại trước khi chạy thật. Adapter dưới đây
- * theo mẫu submit-job rồi poll — mẫu phổ biến nhất cho API sinh ảnh, nhưng vẫn
- * phải xác nhận. Xem docs/unit-economics.md.
+ * Provider mặc định là Gemini image (tên quen thuộc: "nano banana"). Lý do chọn
+ * và bảng so giá các lựa chọn khác: docs/unit-economics.md.
+ *
+ * Điểm quan trọng về giá: API trả về số token đã dùng trong `usageMetadata`, nên
+ * mỗi lần sinh ảnh đều ghi được chi phí thật vào `generations.providerCostVnd`.
+ * Không phải đoán, không phải chạy script riêng để đo.
  *
  * Provider `mock` cho phép chạy toàn bộ luồng (trừ credit, hoàn credit, lưu ảnh)
  * mà không cần credential và không tốn tiền.
  */
 
+import { ApiError, GoogleGenAI, type Part } from "@google/genai";
 import { ProviderError } from "@/lib/errors";
-import { measuredBgRemovalCostVnd, measuredImageCostVnd } from "@/lib/pricing";
+import {
+  imageCost,
+  type ImageCostQuote,
+  type ImageModelId,
+} from "@/lib/pricing";
 
 export type ImageBlob = { data: Buffer; mime: string };
 
 export type ImageResult = ImageBlob & {
-  /** Chi phí THẬT provider tính cho lần gọi này (VND). null = provider không trả về. */
+  /** Chi phí lần gọi này (VND). null = không tính được. */
   costVnd: number | null;
+  /** Nguồn của con số trên — để biết có đang tin vào giá niêm yết hay không. */
+  costSource: ImageCostQuote["source"] | null;
   jobId: string | null;
 };
 
@@ -42,73 +50,72 @@ class MockProvider implements ImageProvider {
 
   async removeBackground(input: ImageBlob): Promise<ImageResult> {
     await delay(200);
-    return { ...input, costVnd: 0, jobId: null };
+    return { ...input, costVnd: 0, costSource: null, jobId: null };
   }
 
-  async compose(args: {
-    subject: ImageBlob;
-    prompt: string;
-    negative: string;
-    aspect: string;
-  }): Promise<ImageResult> {
+  async compose(args: { subject: ImageBlob }): Promise<ImageResult> {
     await delay(400);
     // Trả lại đúng ảnh gốc: đủ để kiểm luồng credit/lưu file, và không giả vờ
     // rằng đã sinh được ảnh thật.
-    return { ...args.subject, costVnd: 0, jobId: `mock_${Date.now()}` };
+    return {
+      ...args.subject,
+      costVnd: 0,
+      costSource: null,
+      jobId: `mock_${Date.now()}`,
+    };
   }
 }
 
 // ---------------------------------------------------------------------------
-// Higgsfield
+// Gemini image ("nano banana")
 // ---------------------------------------------------------------------------
 
-class HiggsfieldProvider implements ImageProvider {
-  readonly name = "higgsfield";
+/**
+ * Gemini chỉ nhận các tỷ lệ này. "4:5" (chuẩn ảnh dọc quen thuộc) KHÔNG có
+ * trong danh sách — phải quy về 3:4, tỷ lệ dọc gần nhất. Gửi thẳng "4:5" sẽ lỗi.
+ */
+const GEMINI_ASPECT: Record<string, string> = {
+  "1:1": "1:1",
+  "4:5": "3:4",
+  "3:4": "3:4",
+  "2:3": "2:3",
+  "9:16": "9:16",
+  "16:9": "16:9",
+  "4:3": "4:3",
+  "3:2": "3:2",
+  "21:9": "21:9",
+};
 
-  private base = process.env.HIGGSFIELD_API_BASE ?? "";
-  private key = process.env.HIGGSFIELD_API_KEY ?? "";
+function toGeminiAspect(aspect: string): string {
+  return GEMINI_ASPECT[aspect] ?? "1:1";
+}
 
-  private ensureConfigured() {
-    if (!this.key || !this.base) {
-      throw new ProviderError(
-        "higgsfield",
-        "Chưa cấu hình HIGGSFIELD_API_KEY / HIGGSFIELD_API_BASE.",
-        false,
-      );
+class GeminiImageProvider implements ImageProvider {
+  readonly name = "gemini";
+
+  private model = (process.env.GEMINI_IMAGE_MODEL ??
+    "gemini-3.1-flash-image-preview") as ImageModelId;
+
+  private client: GoogleGenAI | null = null;
+
+  private ai(): GoogleGenAI {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new ProviderError("gemini", "Chưa cấu hình GEMINI_API_KEY.", false);
     }
-  }
-
-  private async post(path: string, body: unknown): Promise<any> {
-    const res = await fetch(`${this.base}${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new ProviderError(
-        "higgsfield",
-        `HTTP ${res.status}: ${text.slice(0, 300)}`,
-        res.status >= 500 || res.status === 429,
-      );
-    }
-    return res.json();
+    this.client ??= new GoogleGenAI({ apiKey });
+    return this.client;
   }
 
   async removeBackground(input: ImageBlob): Promise<ImageResult> {
-    this.ensureConfigured();
-    const path = process.env.HIGGSFIELD_REMOVE_BG_PATH ?? "/image/remove-background";
-    const json = await this.post(path, {
-      image: `data:${input.mime};base64,${input.data.toString("base64")}`,
+    return this.run({
+      subject: input,
+      prompt:
+        "Remove the background completely and place the subject on a plain pure white background. " +
+        "Keep the subject pixel-identical: do not redraw, recolor, reshape, relight or crop it, " +
+        "and do not alter any text, logo or label on it. Clean, precise edges. Output the image only.",
+      aspect: "1:1",
     });
-    const out = await this.resolve(json);
-    return {
-      ...out,
-      costVnd: out.costVnd ?? measuredBgRemovalCostVnd(),
-    };
   }
 
   async compose(args: {
@@ -117,98 +124,104 @@ class HiggsfieldProvider implements ImageProvider {
     negative: string;
     aspect: string;
   }): Promise<ImageResult> {
-    this.ensureConfigured();
-    const path = process.env.HIGGSFIELD_GENERATE_PATH ?? "/image/generate";
-    const json = await this.post(path, {
-      prompt: args.prompt,
-      negative_prompt: args.negative,
-      aspect_ratio: args.aspect,
-      image: `data:${args.subject.mime};base64,${args.subject.data.toString("base64")}`,
+    return this.run({
+      subject: args.subject,
+      // Gemini không có tham số negative prompt riêng — phải viết thành câu.
+      prompt: `${args.prompt}\n\nAvoid: ${args.negative}.`,
+      aspect: args.aspect,
     });
-    const out = await this.resolve(json);
-    return {
-      ...out,
-      costVnd: out.costVnd ?? measuredImageCostVnd(),
-    };
   }
 
-  /**
-   * Nhận kết quả từ response. Hai dạng: trả ảnh ngay, hoặc trả job id rồi phải
-   * poll. Xử lý cả hai vì không giả định trước dạng nào.
-   */
-  private async resolve(json: any): Promise<ImageResult> {
-    const direct = pickUrl(json);
-    if (direct) {
-      return {
-        ...(await download(direct)),
-        costVnd: pickCost(json),
-        jobId: json.id ?? null,
-      };
+  private async run(args: {
+    subject: ImageBlob;
+    prompt: string;
+    aspect: string;
+  }): Promise<ImageResult> {
+    let response;
+    try {
+      response = await this.ai().models.generateContent({
+        model: this.model,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                inlineData: {
+                  mimeType: args.subject.mime,
+                  data: args.subject.data.toString("base64"),
+                },
+              },
+              { text: args.prompt },
+            ],
+          },
+        ],
+        config: {
+          responseModalities: ["IMAGE"],
+          imageConfig: { aspectRatio: toGeminiAspect(args.aspect) },
+        },
+      });
+    } catch (err) {
+      throw wrapGeminiError(err);
     }
 
-    const jobId = json.id ?? json.job_id;
-    if (!jobId) {
+    const candidate = response.candidates?.[0];
+    const parts: Part[] = candidate?.content?.parts ?? [];
+    const image = parts.find((p) => p.inlineData?.data);
+
+    if (!image?.inlineData?.data) {
+      const finish = String(candidate?.finishReason ?? "KHÔNG_RÕ");
+      const said = parts
+        .map((p) => p.text)
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 200);
+      // Bị chặn vì nội dung thì retry bao nhiêu lần cũng vậy.
+      const blocked = ["SAFETY", "PROHIBITED_CONTENT", "RECITATION", "BLOCKLIST"].includes(
+        finish,
+      );
       throw new ProviderError(
-        "higgsfield",
-        "Response không có ảnh lẫn job id — kiểm tra lại shape API.",
-        false,
+        "gemini",
+        `Không nhận được ảnh (${finish})${said ? `: ${said}` : ""}`,
+        !blocked,
       );
     }
 
-    const jobPath = process.env.HIGGSFIELD_JOB_PATH ?? "/jobs";
-    for (let attempt = 0; attempt < 60; attempt++) {
-      await delay(2000);
-      const res = await fetch(`${this.base}${jobPath}/${jobId}`, {
-        headers: { Authorization: `Bearer ${this.key}` },
-      });
-      if (!res.ok) continue;
-      const job = await res.json();
-      const status = String(job.status ?? "").toLowerCase();
+    const quote = imageCost({
+      model: this.model,
+      // Token ảnh nằm trong phần output của response.
+      outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
+    });
 
-      if (["failed", "error", "cancelled"].includes(status)) {
-        throw new ProviderError(
-          "higgsfield",
-          `Job ${jobId} lỗi: ${job.error ?? status}`,
-          true,
-        );
-      }
+    return {
+      data: Buffer.from(image.inlineData.data, "base64"),
+      mime: image.inlineData.mimeType ?? "image/png",
+      costVnd: quote.costVnd,
+      costSource: quote.source,
+      jobId: response.responseId ?? null,
+    };
+  }
+}
 
-      const url = pickUrl(job);
-      if (url) {
-        return { ...(await download(url)), costVnd: pickCost(job), jobId };
-      }
+function wrapGeminiError(err: unknown): ProviderError {
+  if (err instanceof ApiError) {
+    const retryable = err.status === 429 || err.status >= 500;
+    if (err.status === 401 || err.status === 403) {
+      return new ProviderError("gemini", "GEMINI_API_KEY không hợp lệ.", false);
     }
-
-    throw new ProviderError("higgsfield", `Job ${jobId} quá 2 phút chưa xong.`, true);
+    if (err.status === 429) {
+      return new ProviderError("gemini", "Đang quá tải, thử lại sau ít phút.", true);
+    }
+    return new ProviderError(
+      "gemini",
+      `Lỗi API (${err.status}): ${err.message}`,
+      retryable,
+    );
   }
-}
-
-function pickUrl(json: any): string | null {
-  return (
-    json?.url ??
-    json?.image_url ??
-    json?.output?.url ??
-    json?.result?.url ??
-    (Array.isArray(json?.images) ? json.images[0]?.url ?? json.images[0] : null) ??
-    null
+  return new ProviderError(
+    "gemini",
+    err instanceof Error ? err.message : String(err),
+    true,
   );
-}
-
-function pickCost(json: any): number | null {
-  const usd = json?.cost_usd ?? json?.cost ?? json?.usage?.cost_usd;
-  if (typeof usd === "number" && usd > 0) {
-    return Math.round(usd * Number(process.env.USD_VND ?? 26_300));
-  }
-  return null;
-}
-
-async function download(url: string): Promise<ImageBlob> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new ProviderError("higgsfield", `Tải ảnh về lỗi: HTTP ${res.status}`, true);
-  }
-  const mime = res.headers.get("content-type") ?? "image/png";
-  return { data: Buffer.from(await res.arrayBuffer()), mime };
 }
 
 function delay(ms: number): Promise<void> {
@@ -220,11 +233,15 @@ function delay(ms: number): Promise<void> {
 export function imageProvider(): ImageProvider {
   const name = (process.env.IMAGE_PROVIDER ?? "mock").toLowerCase();
   switch (name) {
-    case "higgsfield":
-      return new HiggsfieldProvider();
+    case "gemini":
+      return new GeminiImageProvider();
     case "mock":
       return new MockProvider();
     default:
+      // Thêm provider mới: implement ImageProvider rồi thêm một case ở đây.
+      // Phần còn lại của app không biết provider nào đang chạy.
       throw new ProviderError("image", `IMAGE_PROVIDER không hợp lệ: ${name}`, false);
   }
 }
+
+export { toGeminiAspect };

@@ -4,13 +4,17 @@ import {
   TARGET_MARGIN,
   claudeCostVnd,
   marginRow,
-  measuredImageCostVnd,
+  imageCost,
+  DEFAULT_IMAGE_MODEL,
+  IMAGE_MODELS,
   revenuePerCreditVnd,
   verdict,
 } from "@/lib/pricing";
 
 beforeEach(() => {
   process.env.USD_VND = "26300";
+  delete process.env.IMAGE_COST_VND_PER_SCENE;
+  delete process.env.GEMINI_IMAGE_USD_PER_MTOK;
 });
 
 describe("tỷ lệ credit đã chốt", () => {
@@ -79,11 +83,45 @@ describe("verdict", () => {
 });
 
 describe("giá vốn ảnh", () => {
-  it("trống nghĩa là CHƯA ĐO, không có giá trị mặc định", () => {
+  it("ưu tiên số đối soát hoá đơn hơn giá niêm yết", () => {
+    process.env.IMAGE_COST_VND_PER_SCENE = "1200";
+    expect(imageCost({ model: DEFAULT_IMAGE_MODEL })).toEqual({
+      costVnd: 1200,
+      source: "INVOICE",
+    });
+  });
+
+  it("tính theo token khi có đơn giá token", () => {
     delete process.env.IMAGE_COST_VND_PER_SCENE;
-    expect(measuredImageCostVnd()).toBeNull();
-    process.env.IMAGE_COST_VND_PER_SCENE = "";
-    expect(measuredImageCostVnd()).toBeNull();
+    process.env.GEMINI_IMAGE_USD_PER_MTOK = "30";
+    // 1290 token × $30/1M = $0.0387 → 1.018đ ở tỷ giá 26.300
+    const q = imageCost({ model: DEFAULT_IMAGE_MODEL, outputTokens: 1290 });
+    expect(q.source).toBe("METERED");
+    expect(q.costVnd).toBe(1018);
+  });
+
+  it("không có gì thì rơi về giá niêm yết của model", () => {
+    delete process.env.IMAGE_COST_VND_PER_SCENE;
+    delete process.env.GEMINI_IMAGE_USD_PER_MTOK;
+    const q = imageCost({ model: DEFAULT_IMAGE_MODEL });
+    expect(q.source).toBe("LIST_PRICE");
+    expect(q.costVnd).toBe(
+      Math.round(IMAGE_MODELS[DEFAULT_IMAGE_MODEL].listPriceUsdPerImage * 26300),
+    );
+  });
+
+  it("model lạ thì trả null chứ không bịa số", () => {
+    delete process.env.IMAGE_COST_VND_PER_SCENE;
+    delete process.env.GEMINI_IMAGE_USD_PER_MTOK;
+    expect(imageCost({ model: "model-khong-ton-tai" })).toEqual({
+      costVnd: null,
+      source: null,
+    });
+  });
+
+  it("model mặc định phải là model được khuyến nghị và còn sống", () => {
+    expect(IMAGE_MODELS[DEFAULT_IMAGE_MODEL].recommended).toBe(true);
+    expect(DEFAULT_IMAGE_MODEL.startsWith("gemini-2.5")).toBe(false);
   });
 });
 

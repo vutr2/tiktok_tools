@@ -3,22 +3,29 @@
  *
  *   npm run economics
  *
- * Ưu tiên đọc số đo thật từ bảng `generations.providerCostVnd`. Không có DB thì
- * đọc từ env. Không có cả hai thì script BÁO ĐỎ và từ chối kết luận — đó là
- * điểm mấu chốt: thà không có số còn hơn có số đoán.
+ * Thứ tự tin cậy của giá vốn:
+ *   1. `generations.providerCostVnd` — chi phí thật của những lần đã chạy
+ *   2. `IMAGE_COST_VND_PER_SCENE` — số đối soát từ hoá đơn provider
+ *   3. Giá niêm yết của model đang cấu hình
+ *
+ * Không có nguồn nào thì script báo đỏ và từ chối kết luận. Thà không có số còn
+ * hơn có số đoán.
  */
 
 import {
   CREDIT_COST,
+  DEFAULT_IMAGE_MODEL,
+  IMAGE_CALLS_PER_PRODUCT,
+  IMAGE_MODELS,
   PHOTO_SCENES_PER_PRODUCT,
   TARGET_MARGIN,
   claudeCostVnd,
   formatVnd,
+  imageCost,
   marginRow,
-  measuredBgRemovalCostVnd,
-  measuredImageCostVnd,
   revenuePerCreditVnd,
   verdict,
+  type ImageModelId,
   type MarginRow,
 } from "../src/lib/pricing";
 
@@ -43,7 +50,7 @@ async function fromDatabase(): Promise<Record<string, Measured>> {
       out[r.type] = {
         costVnd: r._avg.providerCostVnd,
         samples: r._count._all,
-        source: `DB (${r._count._all} lần chạy thật)`,
+        source: `đã chạy thật ${r._count._all} lần`,
       };
     }
     return out;
@@ -60,7 +67,7 @@ function estimateTextCost(kind: "LISTING_COPY" | "VIDEO_SCRIPT"): Measured {
   return {
     costVnd: claudeCostVnd("claude-opus-5", input, output),
     samples: 0,
-    source: `ước tính từ bảng giá token (${input} in / ${output} out)`,
+    source: `bảng giá token (${input} in / ${output} out)`,
   };
 }
 
@@ -73,19 +80,24 @@ function bar(pct: number | null): string {
 async function main() {
   const db = await fromDatabase();
 
-  const imageMeasured: Measured | null = db.PRODUCT_PHOTO
+  const model = (process.env.GEMINI_IMAGE_MODEL ?? DEFAULT_IMAGE_MODEL) as ImageModelId;
+  const quote = imageCost({ model });
+
+  const image: Measured | null = db.PRODUCT_PHOTO
     ? db.PRODUCT_PHOTO
-    : measuredImageCostVnd() !== null
+    : quote.costVnd !== null
       ? {
-          costVnd: measuredImageCostVnd()!,
+          costVnd: quote.costVnd,
           samples: 0,
-          source: "env IMAGE_COST_VND_PER_SCENE",
+          source:
+            quote.source === "INVOICE"
+              ? "đối soát hoá đơn (IMAGE_COST_VND_PER_SCENE)"
+              : `giá niêm yết ${model}`,
         }
       : null;
 
   const listing = db.LISTING_COPY ?? estimateTextCost("LISTING_COPY");
   const script = db.VIDEO_SCRIPT ?? estimateTextCost("VIDEO_SCRIPT");
-
   const perCredit = revenuePerCreditVnd();
 
   const rows: MarginRow[] = [
@@ -93,7 +105,7 @@ async function main() {
       kind: "PRODUCT_PHOTO",
       label: "Ảnh sản phẩm (1 bối cảnh)",
       credits: CREDIT_COST.PRODUCT_PHOTO_PER_SCENE,
-      costVnd: imageMeasured?.costVnd ?? null,
+      costVnd: image?.costVnd ?? null,
     }),
     marginRow({
       kind: "LISTING_COPY",
@@ -110,11 +122,12 @@ async function main() {
   ];
 
   console.log("\n=== KINH TẾ ĐƠN VỊ ===\n");
+  console.log(`Model ảnh:          ${model}`);
   console.log(`Doanh thu / credit: ${formatVnd(perCredit)}`);
   console.log(`Biên mục tiêu:      ${(TARGET_MARGIN * 100).toFixed(0)}%\n`);
 
   const sources: Record<string, string> = {
-    PRODUCT_PHOTO: imageMeasured?.source ?? "CHƯA ĐO",
+    PRODUCT_PHOTO: image?.source ?? "CHƯA CÓ SỐ",
     LISTING_COPY: listing.source,
     VIDEO_SCRIPT: script.source,
   };
@@ -124,7 +137,7 @@ async function main() {
     console.log(`  credit:      ${r.credits}`);
     console.log(`  doanh thu:   ${formatVnd(r.revenueVnd)}`);
     console.log(
-      `  giá vốn:     ${r.costVnd === null ? "CHƯA ĐO" : formatVnd(r.costVnd)}  [${sources[r.kind]}]`,
+      `  giá vốn:     ${r.costVnd === null ? "CHƯA CÓ SỐ" : formatVnd(r.costVnd)}  [${sources[r.kind]}]`,
     );
     console.log(
       `  lãi gộp:     ${r.grossVnd === null ? "—" : formatVnd(r.grossVnd)}`,
@@ -138,38 +151,63 @@ async function main() {
     console.log("");
   }
 
-  // Chi phí một sản phẩm chạy trọn bộ.
+  // Một sản phẩm chạy trọn bộ: 1 lần tách nền + 4 bối cảnh + mô tả + kịch bản.
   const fullPhoto =
-    imageMeasured === null
-      ? null
-      : imageMeasured.costVnd * PHOTO_SCENES_PER_PRODUCT +
-        (measuredBgRemovalCostVnd() ?? 0);
+    image === null ? null : image.costVnd * IMAGE_CALLS_PER_PRODUCT;
   const fullCredits =
     CREDIT_COST.PRODUCT_PHOTO_PER_SCENE * PHOTO_SCENES_PER_PRODUCT +
     CREDIT_COST.LISTING_COPY +
     CREDIT_COST.VIDEO_SCRIPT;
+  const fullRevenue = fullCredits * perCredit;
+  const fullCost =
+    fullPhoto === null ? null : fullPhoto + listing.costVnd + script.costVnd;
 
   console.log("--- Một sản phẩm chạy trọn bộ (4 ảnh + mô tả + kịch bản) ---");
-  console.log(`  credit tiêu:  ${fullCredits} (${((fullCredits / 60) * 100).toFixed(0)}% gói 99k)`);
-  console.log(`  doanh thu:    ${formatVnd(fullCredits * perCredit)}`);
   console.log(
-    `  giá vốn:      ${
-      fullPhoto === null
-        ? "CHƯA ĐO (thiếu giá ảnh)"
-        : formatVnd(fullPhoto + listing.costVnd + script.costVnd)
-    }\n`,
+    `  credit tiêu:  ${fullCredits} (${((fullCredits / 60) * 100).toFixed(0)}% gói 99k)`,
   );
+  console.log(`  doanh thu:    ${formatVnd(fullRevenue)}`);
+  console.log(
+    `  giá vốn:      ${fullCost === null ? "CHƯA CÓ SỐ" : `${formatVnd(fullCost)} (${IMAGE_CALLS_PER_PRODUCT} lần gọi ảnh + 2 lần text)`}`,
+  );
+  if (fullCost !== null) {
+    console.log(
+      `  lãi gộp:      ${formatVnd(fullRevenue - fullCost)}  (${(((fullRevenue - fullCost) / fullRevenue) * 100).toFixed(0)}%)`,
+    );
+  }
+  console.log("");
+
+  // So giá các model ảnh còn lại.
+  console.log("--- Nếu đổi model ảnh ---");
+  for (const [id, spec] of Object.entries(IMAGE_MODELS)) {
+    const cost = imageCost({ model: id }).costVnd;
+    const row = marginRow({
+      kind: "PRODUCT_PHOTO",
+      label: spec.label,
+      credits: CREDIT_COST.PRODUCT_PHOTO_PER_SCENE,
+      costVnd: process.env.IMAGE_COST_VND_PER_SCENE ? null : cost,
+    });
+    const mark = id === model ? "→" : " ";
+    console.log(
+      `  ${mark} ${spec.label.padEnd(42)} ${cost === null ? "—" : formatVnd(cost).padStart(9)} / ảnh   biên ${
+        row.marginPct === null ? "—" : `${(row.marginPct * 100).toFixed(0)}%`
+      }`,
+    );
+    console.log(`     ${spec.note}`);
+  }
+  console.log("");
 
   const v = verdict(rows);
+  let hardFail = false;
 
   if (v.unmeasured.length > 0) {
+    hardFail = true;
     console.log("🔴 CHƯA CHỐT ĐƯỢC TỶ LỆ CREDIT");
-    console.log(`   Thiếu giá vốn thật của: ${v.unmeasured.join(", ")}`);
-    console.log("   Chạy `npm run probe:image-cost <đường-dẫn-ảnh>` với provider thật,");
-    console.log("   hoặc điền IMAGE_COST_VND_PER_SCENE vào .env sau khi đo.\n");
+    console.log(`   Thiếu giá vốn của: ${v.unmeasured.join(", ")}\n`);
   }
 
   for (const r of v.negative) {
+    hardFail = true;
     console.log(`🔴 LỖ: ${r.label} — mỗi lần chạy mất ${formatVnd(-r.grossVnd!)}.`);
     console.log(`   Nâng lên ${r.suggestedCredits} credit, hoặc hạ effort/model.\n`);
   }
@@ -187,9 +225,16 @@ async function main() {
     }
   }
 
+  if (quote.source === "LIST_PRICE" && !db.PRODUCT_PHOTO) {
+    console.log("🟡 Giá ảnh đang lấy từ GIÁ NIÊM YẾT, chưa đối soát hoá đơn.");
+    console.log("   Hoá đơn thật còn có lần gọi hỏng, retry và thuế. Sau vài trăm");
+    console.log("   ảnh đầu tiên, lấy số trên bảng billing chia cho số ảnh rồi điền:");
+    console.log("     IMAGE_COST_VND_PER_SCENE=<vnd mỗi ảnh>\n");
+  }
+
   if (v.ok) console.log("🟢 Tỷ lệ credit hiện tại đạt biên mục tiêu.\n");
 
-  process.exit(v.unmeasured.length > 0 || v.negative.length > 0 ? 1 : 0);
+  process.exit(hardFail ? 1 : 0);
 }
 
 main().catch((err) => {
