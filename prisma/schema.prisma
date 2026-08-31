@@ -1,0 +1,194 @@
+// Schema tối thiểu — ĐÚNG 6 BẢNG, không thêm.
+// Bất kỳ bảng thứ 7 nào cũng phải qua một quyết định scope mới.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Industry {
+  MY_PHAM // mỹ phẩm
+  THOI_TRANG // thời trang
+  GIA_DUNG // gia dụng
+  ME_VA_BE // mẹ & bé
+  PHU_KIEN // phụ kiện
+}
+
+enum GenerationType {
+  PRODUCT_PHOTO // ảnh sản phẩm: tách nền + ghép bối cảnh
+  LISTING_COPY // tiêu đề + mô tả + hashtag
+  VIDEO_SCRIPT // 5 kịch bản video 30s
+}
+
+enum GenerationStatus {
+  PENDING // đã tạo bản ghi, chưa trừ credit
+  RUNNING // đã trừ credit, đang gọi provider
+  SUCCEEDED
+  FAILED // đã hoàn credit (nếu đã trừ)
+}
+
+enum CreditTxnType {
+  TOPUP // nạp từ payment
+  BONUS // tặng khi đăng ký
+  DEBIT // trừ trước khi gọi API
+  REFUND // hoàn khi provider lỗi
+  ADJUSTMENT // CSKH chỉnh tay
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  phone     String?
+  // Ngành hàng mặc định — bắt chọn ngay bước đầu, quyết định bộ prompt.
+  industry  Industry?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  wallet       CreditWallet?
+  transactions CreditTransaction[]
+  products     Product[]
+  generations  Generation[]
+  payments     Payment[]
+
+  @@map("users")
+}
+
+model CreditWallet {
+  id      String @id @default(cuid())
+  userId  String @unique
+  balance Int    @default(0)
+
+  // Cộng dồn để đối soát: balance phải luôn == totalIn - totalOut.
+  totalIn  Int @default(0)
+  totalOut Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+
+  @@map("credit_wallet")
+}
+
+model CreditTransaction {
+  id       String        @id @default(cuid())
+  userId   String
+  walletId String
+  type     CreditTxnType
+  // Âm khi trừ, dương khi cộng. Sổ cái append-only, không bao giờ UPDATE.
+  delta        Int
+  balanceAfter Int
+
+  // Chống trừ/hoàn hai lần. Ví dụ: "debit:<generationId>", "refund:<generationId>".
+  idempotencyKey String  @unique
+  generationId   String?
+  paymentId      String?
+  note           String?
+  createdAt      DateTime @default(now())
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet     CreditWallet  @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  generation Generation?   @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  payment    Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("credit_transactions")
+}
+
+model Product {
+  id       String   @id @default(cuid())
+  userId   String
+  industry Industry
+  name     String
+
+  // Ảnh gốc chụp bằng điện thoại + ảnh đã tách nền (cache, tách 1 lần dùng lại).
+  originalImageKey String
+  cutoutImageKey   String?
+
+  // Vài dòng thông tin người bán nhập: giá, chất liệu, size, đối tượng, USP...
+  // Json vì mỗi ngành hỏi một bộ field khác nhau.
+  info Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generations Generation[]
+
+  @@index([userId, createdAt])
+  @@map("products")
+}
+
+model Generation {
+  id        String           @id @default(cuid())
+  userId    String
+  productId String?
+  type      GenerationType
+  status    GenerationStatus @default(PENDING)
+  industry  Industry
+
+  input  Json  @default("{}")
+  output Json?
+
+  // Credit đã trừ. Về 0 sau khi hoàn.
+  creditsCharged Int     @default(0)
+  provider       String?
+  providerJobId  String?
+
+  // Giá thực tế provider tính cho lần chạy này (VND).
+  // Đây là nguồn dữ liệu để chốt tỷ lệ credit — KHÔNG đoán, đọc từ đây.
+  providerCostVnd Int?
+
+  errorCode    String?
+  errorMessage String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product      Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  transactions CreditTransaction[]
+
+  @@index([userId, createdAt])
+  @@index([type, status])
+  @@map("generations")
+}
+
+model Payment {
+  id     String @id @default(cuid())
+  userId String
+
+  packId    String
+  amountVnd Int
+  credits   Int
+
+  provider    String // "bank_transfer" | "momo" | ...
+  providerRef String? // mã giao dịch / nội dung chuyển khoản
+  status      PaymentStatus @default(PENDING)
+  raw         Json? // payload webhook gốc, để đối soát
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  paidAt    DateTime?
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions CreditTransaction[]
+
+  @@unique([provider, providerRef])
+  @@index([userId, createdAt])
+  @@map("payments")
+}

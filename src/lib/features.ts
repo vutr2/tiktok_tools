@@ -1,0 +1,256 @@
+/**
+ * Ba chức năng của MVP. Không có chức năng thứ tư.
+ *
+ * 1. generateProductPhotos — ảnh sản phẩm: tách nền + ghép 4 bối cảnh
+ * 2. generateListing       — mô tả sàn: tiêu đề + mô tả + hashtag
+ * 3. generateScripts       — 5 kịch bản video 30s
+ */
+
+import type { Product } from "@prisma/client";
+import { prisma } from "./db";
+import { getBalance } from "./credits";
+import { runGeneration } from "./generation";
+import { AppError, InsufficientCreditsError } from "./errors";
+import { CREDIT_COST } from "./pricing";
+import { getImage, putImage, publicUrl, isAllowedMime } from "./storage";
+import { imageProvider } from "./ai/image";
+import {
+  generateListingCopy,
+  generateVideoScripts,
+  type ImageInput,
+  type ListingCopy,
+  type VideoScript,
+} from "./ai/claude";
+import { allScenes, buildPhotoPrompt, getScene } from "@/prompts";
+import type { Industry } from "./industries";
+
+async function loadProduct(userId: string, productId: string): Promise<Product> {
+  const product = await prisma.product.findFirst({
+    where: { id: productId, userId },
+  });
+  if (!product) throw new AppError("NOT_FOUND", "Không tìm thấy sản phẩm", 404);
+  return product;
+}
+
+/** Ảnh cho Claude đọc: ưu tiên ảnh đã tách nền, chưa có thì dùng ảnh gốc. */
+async function productImageInput(product: Product): Promise<ImageInput | undefined> {
+  const key = product.cutoutImageKey ?? product.originalImageKey;
+  try {
+    const { data, mime } = await getImage(key);
+    if (!isAllowedMime(mime)) return undefined;
+    return { base64: data.toString("base64"), mediaType: mime };
+  } catch {
+    return undefined;
+  }
+}
+
+function productInfo(product: Product) {
+  return {
+    name: product.name,
+    ...(product.info as Record<string, unknown>),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 1. Ảnh sản phẩm
+// ---------------------------------------------------------------------------
+
+export type PhotoResult = {
+  sceneId: string;
+  sceneName: string;
+  ok: boolean;
+  url?: string;
+  generationId: string | null;
+  error?: string;
+};
+
+/**
+ * Tách nền một lần rồi cache vào product.cutoutImageKey. Lần sinh ảnh thứ hai
+ * cho cùng sản phẩm không gọi lại bước này.
+ */
+export async function ensureCutout(product: Product): Promise<Product> {
+  if (product.cutoutImageKey) return product;
+
+  const provider = imageProvider();
+  const original = await getImage(product.originalImageKey);
+  const cut = await provider.removeBackground(original);
+
+  const key = await putImage({
+    userId: product.userId,
+    data: cut.data,
+    mime: isAllowedMime(cut.mime) ? cut.mime : "image/png",
+    prefix: "cutout",
+  });
+
+  return prisma.product.update({
+    where: { id: product.id },
+    data: { cutoutImageKey: key },
+  });
+}
+
+export async function generateProductPhotos(args: {
+  userId: string;
+  productId: string;
+  sceneIds?: string[];
+}): Promise<{ results: PhotoResult[]; creditsCharged: number; balance: number }> {
+  let product = await loadProduct(args.userId, args.productId);
+  const industry = product.industry as Industry;
+
+  const sceneIds =
+    args.sceneIds && args.sceneIds.length > 0
+      ? args.sceneIds
+      : allScenes(industry).map((s) => s.id);
+
+  // Kiểm đủ credit cho TOÀN BỘ số bối cảnh trước khi chạy cái nào. Chạy được 2/4
+  // rồi hết credit là trải nghiệm tệ nhất có thể.
+  const total = sceneIds.length * CREDIT_COST.PRODUCT_PHOTO_PER_SCENE;
+  const balance = await getBalance(args.userId);
+  if (balance < total) throw new InsufficientCreditsError(total, balance);
+
+  product = await ensureCutout(product);
+  const cutout = await getImage(product.cutoutImageKey!);
+  const provider = imageProvider();
+
+  const results: PhotoResult[] = [];
+  let creditsCharged = 0;
+
+  for (const sceneId of sceneIds) {
+    const scene = getScene(industry, sceneId);
+    const spec = buildPhotoPrompt({
+      industry,
+      sceneId,
+      productName: product.name,
+    });
+
+    try {
+      const run = await runGeneration({
+        userId: args.userId,
+        productId: product.id,
+        type: "PRODUCT_PHOTO",
+        industry: product.industry,
+        credits: CREDIT_COST.PRODUCT_PHOTO_PER_SCENE,
+        provider: provider.name,
+        input: { sceneId, prompt: spec.prompt, aspect: spec.aspect },
+        run: async () => {
+          const image = await provider.compose({
+            subject: cutout,
+            prompt: spec.prompt,
+            negative: spec.negative,
+            aspect: spec.aspect,
+          });
+          const key = await putImage({
+            userId: args.userId,
+            data: image.data,
+            mime: isAllowedMime(image.mime) ? image.mime : "image/png",
+            prefix: `scene/${sceneId}`,
+          });
+          return {
+            output: { key, url: publicUrl(key), sceneId },
+            providerCostVnd: image.costVnd,
+            providerJobId: image.jobId,
+          };
+        },
+      });
+
+      creditsCharged += run.creditsCharged;
+      results.push({
+        sceneId,
+        sceneName: scene.name,
+        ok: true,
+        url: (run.output as { url: string }).url,
+        generationId: run.generationId,
+      });
+    } catch (err) {
+      // Credit của bối cảnh này đã được hoàn trong runGeneration.
+      results.push({
+        sceneId,
+        sceneName: scene.name,
+        ok: false,
+        generationId: null,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return {
+    results,
+    creditsCharged,
+    balance: await getBalance(args.userId),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 2. Mô tả sàn
+// ---------------------------------------------------------------------------
+
+export async function generateListing(args: {
+  userId: string;
+  productId: string;
+}): Promise<{ output: ListingCopy; generationId: string; balance: number }> {
+  const product = await loadProduct(args.userId, args.productId);
+  const image = await productImageInput(product);
+
+  const run = await runGeneration<ListingCopy>({
+    userId: args.userId,
+    productId: product.id,
+    type: "LISTING_COPY",
+    industry: product.industry,
+    credits: CREDIT_COST.LISTING_COPY,
+    provider: "claude",
+    input: { productId: product.id, info: productInfo(product) },
+    run: async () => {
+      const { output, costVnd } = await generateListingCopy({
+        industry: product.industry as Industry,
+        info: productInfo(product),
+        image,
+      });
+      return { output, providerCostVnd: costVnd };
+    },
+  });
+
+  return {
+    output: run.output,
+    generationId: run.generationId,
+    balance: run.balanceAfter,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 3. Kịch bản video 30s
+// ---------------------------------------------------------------------------
+
+export async function generateScripts(args: {
+  userId: string;
+  productId: string;
+}): Promise<{
+  output: { scripts: VideoScript[] };
+  generationId: string;
+  balance: number;
+}> {
+  const product = await loadProduct(args.userId, args.productId);
+  const image = await productImageInput(product);
+
+  const run = await runGeneration<{ scripts: VideoScript[] }>({
+    userId: args.userId,
+    productId: product.id,
+    type: "VIDEO_SCRIPT",
+    industry: product.industry,
+    credits: CREDIT_COST.VIDEO_SCRIPT,
+    provider: "claude",
+    input: { productId: product.id, info: productInfo(product) },
+    run: async () => {
+      const { output, costVnd } = await generateVideoScripts({
+        industry: product.industry as Industry,
+        info: productInfo(product),
+        image,
+      });
+      return { output, providerCostVnd: costVnd };
+    },
+  });
+
+  return {
+    output: run.output,
+    generationId: run.generationId,
+    balance: run.balanceAfter,
+  };
+}
