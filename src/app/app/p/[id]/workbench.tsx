@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, buttonClass, buttonGhostClass, Card } from "@/components/ui";
+import { Badge, buttonClass, buttonGhostClass, Card, Shimmer } from "@/components/ui";
+import ScriptPlayer, { type PlayerScript } from "@/components/script-player";
 
 type Scene = { id: string; name: string; useCase: string };
 
@@ -33,30 +34,23 @@ type Listing = {
   };
 };
 
-type Scene30 = {
-  seconds: number;
-  voiceover: string;
-  shot: string;
-  onScreenText: string;
-};
-
-type Script = {
-  angle: string;
-  objectionHandled: string;
-  hook: Scene30;
-  scenes: Scene30[];
-  cta: string;
-  totalSeconds: number;
-  warnings: string[];
-};
+const TABS: [Tab, string, string][] = [
+  ["photos", "✨", "Ảnh studio"],
+  ["listing", "📝", "Mô tả sàn"],
+  ["scripts", "🎬", "Kịch bản"],
+];
 
 export default function Workbench({
   productId,
+  productName,
+  originalUrl,
   scenes,
   cost,
   balance: initialBalance,
 }: {
   productId: string;
+  productName: string;
+  originalUrl: string;
   scenes: Scene[];
   cost: {
     PRODUCT_PHOTO_PER_SCENE: number;
@@ -73,7 +67,13 @@ export default function Workbench({
   const [picked, setPicked] = useState<string[]>(scenes.map((s) => s.id));
   const [photos, setPhotos] = useState<PhotoResult[] | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
-  const [scripts, setScripts] = useState<Script[] | null>(null);
+  const [scripts, setScripts] = useState<PlayerScript[] | null>(null);
+
+  // Ảnh đã dựng xong sẽ thành hình nền cho trình phát kịch bản — hai chức năng
+  // nối vào nhau, đây là chỗ app khác hẳn một khung chat.
+  const readyPhotos = (photos ?? [])
+    .filter((p) => p.ok && p.url)
+    .map((p) => p.url as string);
 
   async function call(kind: Tab, path: string, body?: unknown) {
     setBusy(kind);
@@ -98,46 +98,42 @@ export default function Workbench({
   const photoCost = picked.length * cost.PRODUCT_PHOTO_PER_SCENE;
 
   return (
-    <div className="mt-8">
-      <div className="flex gap-2 border-b border-[--color-line]">
-        {(
-          [
-            ["photos", "Ảnh sản phẩm"],
-            ["listing", "Mô tả sàn"],
-            ["scripts", "Kịch bản video"],
-          ] as [Tab, string][]
-        ).map(([key, label]) => (
+    <div className="mt-6">
+      {/* Tab kiểu app, không phải kiểu tài liệu */}
+      <div className="flex items-center gap-1 rounded-2xl border border-line bg-panel p-1">
+        {TABS.map(([key, icon, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
               tab === key
-                ? "border-[--color-brand] text-[--color-brand]"
-                : "border-transparent text-[--color-muted]"
+                ? "bg-raise text-ink shadow-sm"
+                : "text-muted hover:text-ink"
             }`}
           >
-            {label}
+            <span>{icon}</span>
+            <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
-        <span className="ml-auto self-center text-sm text-[--color-muted]">
-          Còn {balance} credit
-        </span>
       </div>
 
       {error ? (
-        <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+        <p className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-300">
           {error}
         </p>
       ) : null}
 
+      {/* ─────────────── Ảnh studio ─────────────── */}
       {tab === "photos" ? (
         <section className="mt-6">
-          <p className="text-sm text-[--color-muted]">
-            Chọn bối cảnh muốn dựng. Mỗi ảnh {cost.PRODUCT_PHOTO_PER_SCENE}{" "}
-            credit — chọn ít lại nếu chỉ cần ảnh bìa.
-          </p>
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold">Chọn bối cảnh</h2>
+            <span className="text-xs text-muted">
+              {cost.PRODUCT_PHOTO_PER_SCENE} credit / ảnh · còn {balance}
+            </span>
+          </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {scenes.map((s) => {
               const on = picked.includes(s.id);
               return (
@@ -148,16 +144,27 @@ export default function Workbench({
                       on ? prev.filter((x) => x !== s.id) : [...prev, s.id],
                     )
                   }
-                  className={`rounded-xl border p-4 text-left ${
+                  className={`flex gap-3 rounded-2xl border p-4 text-left transition ${
                     on
-                      ? "border-[--color-brand] bg-[--color-brand-soft]"
-                      : "border-[--color-line] bg-white"
+                      ? "border-brand bg-brand-soft"
+                      : "border-line bg-panel hover:border-dim"
                   }`}
                 >
-                  <div className="text-sm font-semibold">{s.name}</div>
-                  <div className="mt-1 text-xs text-[--color-muted]">
-                    {s.useCase}
-                  </div>
+                  <span
+                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] ${
+                      on
+                        ? "border-brand bg-brand text-white"
+                        : "border-line text-transparent"
+                    }`}
+                  >
+                    ✓
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold">{s.name}</span>
+                    <span className="mt-1 block text-xs text-muted">
+                      {s.useCase}
+                    </span>
+                  </span>
                 </button>
               );
             })}
@@ -172,40 +179,88 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={`${buttonClass} mt-5`}
+            className={`${buttonClass} mt-5 w-full sm:w-auto`}
           >
             {busy === "photos"
               ? "Đang dựng ảnh..."
-              : `Dựng ${picked.length} ảnh (${photoCost} credit)`}
+              : `✨ Dựng ${picked.length} ảnh · ${photoCost} credit`}
           </button>
 
-          {photos ? (
+          {busy === "photos" ? (
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {photos.map((p) => (
-                <Card key={p.sceneId}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-semibold">{p.sceneName}</span>
-                    <Badge tone={p.ok ? "ok" : "error"}>
-                      {p.ok ? "Xong" : "Lỗi — đã hoàn credit"}
-                    </Badge>
-                  </div>
-                  {p.ok && p.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.url}
-                      alt={p.sceneName}
-                      className="w-full rounded-lg"
-                    />
-                  ) : (
-                    <p className="text-sm text-red-600">{p.error}</p>
-                  )}
-                </Card>
+              {picked.map((id) => (
+                <Shimmer key={id} className="aspect-square w-full" />
               ))}
+            </div>
+          ) : null}
+
+          {photos ? (
+            <div className="mt-8">
+              <h3 className="text-sm font-semibold">Trước &amp; sau</h3>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <figure className="overflow-hidden rounded-2xl border border-line bg-panel">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={originalUrl}
+                    alt="Ảnh gốc"
+                    className="aspect-square w-full object-cover opacity-70"
+                  />
+                  <figcaption className="p-3 text-xs text-muted">
+                    Ảnh bạn chụp
+                  </figcaption>
+                </figure>
+
+                {photos.map((p) => (
+                  <figure
+                    key={p.sceneId}
+                    className="overflow-hidden rounded-2xl border border-line bg-panel"
+                  >
+                    {p.ok && p.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.url}
+                        alt={p.sceneName}
+                        className="aspect-square w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex aspect-square w-full items-center justify-center bg-raise p-4 text-center text-xs text-red-300">
+                        {p.error}
+                      </div>
+                    )}
+                    <figcaption className="flex items-center justify-between p-3">
+                      <span className="truncate text-xs font-medium">
+                        {p.sceneName}
+                      </span>
+                      {p.ok ? (
+                        <a
+                          href={p.url}
+                          download
+                          className="shrink-0 text-xs text-neon"
+                        >
+                          Tải
+                        </a>
+                      ) : (
+                        <Badge tone="error">Đã hoàn credit</Badge>
+                      )}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+
+              {readyPhotos.length > 0 ? (
+                <button
+                  onClick={() => setTab("scripts")}
+                  className={`${buttonGhostClass} mt-5`}
+                >
+                  🎬 Xem kịch bản chạy trên ảnh này →
+                </button>
+              ) : null}
             </div>
           ) : null}
         </section>
       ) : null}
 
+      {/* ─────────────── Mô tả sàn ─────────────── */}
       {tab === "listing" ? (
         <section className="mt-6">
           <button
@@ -217,12 +272,19 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={buttonClass}
+            className={`${buttonClass} w-full sm:w-auto`}
           >
             {busy === "listing"
               ? "Đang viết..."
-              : `Viết mô tả (${cost.LISTING_COPY} credit)`}
+              : `📝 Viết mô tả · ${cost.LISTING_COPY} credit`}
           </button>
+
+          {busy === "listing" ? (
+            <div className="mt-6 space-y-3">
+              <Shimmer className="h-20 w-full" />
+              <Shimmer className="h-32 w-full" />
+            </div>
+          ) : null}
 
           {listing ? (
             <div className="mt-6 space-y-4">
@@ -241,11 +303,11 @@ export default function Workbench({
 
               <Card>
                 <Header label="Mô tả" text={listing.description} />
-                <pre className="mt-2 whitespace-pre-wrap text-sm">
+                <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-ink">
                   {listing.description}
                 </pre>
                 {listing.bulletPoints.length > 0 ? (
-                  <ul className="mt-3 list-disc pl-5 text-sm">
+                  <ul className="mt-3 list-disc pl-5 text-sm text-ink">
                     {listing.bulletPoints.map((b, i) => (
                       <li key={i}>{b}</li>
                     ))}
@@ -256,28 +318,32 @@ export default function Workbench({
               <Card>
                 <div className="text-sm font-semibold">Hashtag</div>
                 <p className="mt-2 text-sm">
-                  <span className="text-[--color-muted]">Shopee: </span>
-                  {listing.shopeeHashtags.join(" ")}
+                  <span className="text-muted">Shopee: </span>
+                  <span className="text-neon">
+                    {listing.shopeeHashtags.join(" ")}
+                  </span>
                 </p>
                 <p className="mt-1 text-sm">
-                  <span className="text-[--color-muted]">TikTok: </span>
-                  {listing.tiktokHashtags.join(" ")}
+                  <span className="text-muted">TikTok: </span>
+                  <span className="text-neon">
+                    {listing.tiktokHashtags.join(" ")}
+                  </span>
                 </p>
-                <p className="mt-3 text-xs text-[--color-muted]">
+                <p className="mt-3 text-xs text-dim">
                   Từ khoá chạy quảng cáo: {listing.keywords.join(", ")}
                 </p>
               </Card>
 
               {listing.issues.claims.length > 0 ? (
-                <Card className="border-amber-300 bg-amber-50">
-                  <div className="text-sm font-semibold">
-                    Cụm từ có rủi ro bị gỡ listing
+                <Card className="border-amber-500/30 bg-amber-500/10">
+                  <div className="text-sm font-semibold text-amber-200">
+                    ⚠ Cụm từ có rủi ro bị gỡ listing
                   </div>
-                  <ul className="mt-2 space-y-2 text-sm">
+                  <ul className="mt-2 space-y-2 text-sm text-amber-100/90">
                     {listing.issues.claims.map((c, i) => (
                       <li key={i}>
                         <b>&ldquo;{c.matched}&rdquo;</b> — {c.why}
-                        <div className="text-[--color-muted]">→ {c.fix}</div>
+                        <div className="text-amber-200/70">→ {c.fix}</div>
                       </li>
                     ))}
                   </ul>
@@ -288,6 +354,7 @@ export default function Workbench({
         </section>
       ) : null}
 
+      {/* ─────────────── Kịch bản ─────────────── */}
       {tab === "scripts" ? (
         <section className="mt-6">
           <button
@@ -299,73 +366,25 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={buttonClass}
+            className={`${buttonClass} w-full sm:w-auto`}
           >
             {busy === "scripts"
               ? "Đang viết kịch bản..."
-              : `Viết 5 kịch bản (${cost.VIDEO_SCRIPT} credit)`}
+              : `🎬 Viết 5 kịch bản · ${cost.VIDEO_SCRIPT} credit`}
           </button>
 
-          {scripts ? (
-            <div className="mt-6 space-y-4">
-              {scripts.map((s, i) => (
-                <Card key={i}>
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">
-                      Kịch bản {i + 1}: {s.angle}
-                    </div>
-                    <Badge tone={Math.abs(s.totalSeconds - 30) <= 2 ? "ok" : "warn"}>
-                      {s.totalSeconds}s
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-[--color-muted]">
-                    Đập lại phản đối: {s.objectionHandled}
-                  </p>
-
-                  <div className="mt-3 rounded-lg bg-[--color-brand-soft] p-3">
-                    <div className="text-xs font-semibold uppercase text-[--color-brand]">
-                      Hook {s.hook.seconds}s
-                    </div>
-                    <p className="mt-1 text-sm font-medium">
-                      {s.hook.voiceover}
-                    </p>
-                    <p className="mt-1 text-xs text-[--color-muted]">
-                      Cảnh: {s.hook.shot}
-                    </p>
-                    <p className="text-xs text-[--color-muted]">
-                      Chữ trên màn hình: {s.hook.onScreenText}
-                    </p>
-                  </div>
-
-                  <ol className="mt-3 space-y-3">
-                    {s.scenes.map((sc, j) => (
-                      <li key={j} className="border-l-2 border-[--color-line] pl-3">
-                        <div className="text-xs font-semibold text-[--color-muted]">
-                          {sc.seconds}s
-                        </div>
-                        <p className="text-sm">{sc.voiceover}</p>
-                        <p className="text-xs text-[--color-muted]">
-                          Cảnh: {sc.shot}
-                        </p>
-                        <p className="text-xs text-[--color-muted]">
-                          Chữ: {sc.onScreenText}
-                        </p>
-                      </li>
-                    ))}
-                  </ol>
-
-                  <p className="mt-3 text-sm font-medium">CTA: {s.cta}</p>
-
-                  {s.warnings.length > 0 ? (
-                    <ul className="mt-3 space-y-1 text-xs text-amber-700">
-                      {s.warnings.map((w, k) => (
-                        <li key={k}>⚠ {w}</li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </Card>
-              ))}
+          {busy === "scripts" ? (
+            <div className="mt-6 flex justify-center">
+              <Shimmer className="aspect-[9/16] w-full max-w-[300px] rounded-[2rem]" />
             </div>
+          ) : null}
+
+          {scripts ? (
+            <ScriptPlayer
+              scripts={scripts}
+              photos={readyPhotos}
+              productName={productName}
+            />
           ) : null}
         </section>
       ) : null}
@@ -379,7 +398,7 @@ function Header({ label, text }: { label: string; text: string }) {
       <span className="text-sm font-semibold">{label}</span>
       <button
         onClick={() => navigator.clipboard?.writeText(text)}
-        className={`${buttonGhostClass} px-2 py-1 text-xs`}
+        className="rounded-lg border border-line bg-raise px-2.5 py-1 text-xs font-medium transition hover:border-dim"
       >
         Chép
       </button>
@@ -399,13 +418,18 @@ function TitleCard({
   issues: Issue[];
 }) {
   const over = value.length > limit;
+  const pct = Math.min(100, (value.length / limit) * 100);
   return (
     <Card>
       <Header label={label} text={value} />
-      <p className="mt-2 text-sm">{value}</p>
-      <p
-        className={`mt-1 text-xs ${over ? "text-red-600" : "text-[--color-muted]"}`}
-      >
+      <p className="mt-2 text-sm text-ink">{value}</p>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-raise">
+        <div
+          className={`h-full rounded-full ${over ? "bg-red-500" : "bg-neon"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className={`mt-1 text-xs ${over ? "text-red-400" : "text-dim"}`}>
         {value.length}/{limit} ký tự
       </p>
       {issues.length > 0 ? (
@@ -413,7 +437,7 @@ function TitleCard({
           {issues.map((i, k) => (
             <li
               key={k}
-              className={i.level === "error" ? "text-red-600" : "text-amber-700"}
+              className={i.level === "error" ? "text-red-400" : "text-amber-300"}
             >
               {i.message}
             </li>

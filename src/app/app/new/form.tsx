@@ -93,22 +93,36 @@ export default function NewProductForm({
         label="Ảnh sản phẩm"
         hint="Đặt sản phẩm trên nền trơn, đủ sáng. Tối đa 12MB."
       >
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className={inputClass}
-        />
+        <label className="mt-1 block cursor-pointer">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="sr-only"
+          />
+          {preview ? (
+            <div className="relative overflow-hidden rounded-2xl border border-brand/40">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={preview}
+                alt="Xem trước"
+                className="aspect-square w-full max-w-xs object-cover"
+              />
+              <span className="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs text-white backdrop-blur">
+                Đổi ảnh khác
+              </span>
+            </div>
+          ) : (
+            <div className="flex aspect-square w-full max-w-xs flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line bg-panel text-center transition hover:border-brand/50">
+              <span className="text-4xl">📷</span>
+              <span className="text-sm font-medium">Chọn ảnh sản phẩm</span>
+              <span className="px-6 text-xs text-dim">
+                Chụp bằng điện thoại là được — máy sẽ tách nền rồi ghép bối cảnh
+              </span>
+            </div>
+          )}
+        </label>
       </Field>
-
-      {preview ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={preview}
-          alt="Xem trước"
-          className="h-40 w-40 rounded-lg border border-[--color-line] object-cover"
-        />
-      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {fields.map((f) => (
@@ -126,9 +140,9 @@ export default function NewProductForm({
         ))}
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
-      <button type="submit" disabled={busy} className={buttonClass}>
+      <button type="submit" disabled={busy} className={`${buttonClass} w-full sm:w-auto`}>
         {busy ? "Đang tải lên..." : "Lưu sản phẩm"}
       </button>
     </form>

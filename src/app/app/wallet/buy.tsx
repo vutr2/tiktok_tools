@@ -11,7 +11,7 @@ export default function BuyPack({ packId }: { packId: string }) {
     <div className="mt-4">
       <button
         disabled={busy}
-        className={buttonClass}
+        className={`${buttonClass} w-full`}
         onClick={async () => {
           setBusy(true);
           const res = await fetch("/api/payments", {
@@ -30,7 +30,7 @@ export default function BuyPack({ packId }: { packId: string }) {
       {note ? (
         <div className="mt-3 rounded-lg bg-neutral-100 p-3 text-sm">
           Chuyển khoản với nội dung: <b>{note}</b>
-          <div className="mt-1 text-xs text-[--color-muted]">
+          <div className="mt-1 text-xs text-muted">
             Credit vào ví ngay sau khi hệ thống nhận được báo có.
           </div>
         </div>

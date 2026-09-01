@@ -7,7 +7,15 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+
+  // Supabase: DATABASE_URL đi qua connection pooler (cổng 6543) — app chạy
+  // serverless, mỗi request một lambda, không thể mỗi cái giữ một connection thật.
+  url = env("DATABASE_URL")
+
+  // Pooler ở chế độ transaction không chạy được DDL, nên `prisma db push` /
+  // `migrate` phải đi đường trực tiếp (cổng 5432). Prisma tự chọn đúng URL.
+  // Postgres local: điền cùng một chuỗi cho cả hai biến.
+  directUrl = env("DIRECT_URL")
 }
 
 enum Industry {

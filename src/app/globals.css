@@ -1,20 +1,89 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #16161a;
-  --color-muted: #6b6b76;
-  --color-line: #e6e6ea;
-  --color-brand: #e23744;
-  --color-brand-soft: #fff1f2;
+  /* Nền tối cố ý: ảnh sản phẩm là nhân vật chính, nền càng lùi càng tốt.
+     Đây cũng là thứ tách app sáng tạo khỏi dashboard SaaS nền trắng. */
+  --color-canvas: #08080b;
+  --color-panel: #121217;
+  --color-raise: #1b1b22;
+  --color-line: #272730;
+  --color-ink: #f4f4f6;
+  --color-muted: #8d8d99;
+  --color-dim: #5f5f6b;
+
+  /* Cặp màu TikTok. Dùng dè — chỉ cho thứ bấm được và thứ đang chạy. */
+  --color-brand: #fe2c55;
+  --color-neon: #25f4ee;
+  --color-brand-soft: #2a0e16;
+
+  --animate-kenburns: kenburns 7s ease-out both;
+  --animate-rise: rise 0.34s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+}
+
+@keyframes kenburns {
+  from {
+    transform: scale(1.03);
+  }
+  to {
+    transform: scale(1.13);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
 }
 
 html {
-  background: #fafafa;
+  background: var(--color-canvas);
   color: var(--color-ink);
+  color-scheme: dark;
 }
 
 body {
   font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dải chip cuộn ngang không cần thanh cuộn. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Chữ trên ảnh — viền mờ để đọc được trên mọi nền. */
+.caption-shadow {
+  text-shadow:
+    0 2px 12px rgb(0 0 0 / 0.75),
+    0 1px 3px rgb(0 0 0 / 0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

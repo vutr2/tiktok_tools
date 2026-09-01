@@ -4,7 +4,8 @@ out/
 build/
 storage/
 .env
-.env.local
+.env.*
+!.env.example
 *.tsbuildinfo
 next-env.d.ts
 coverage/

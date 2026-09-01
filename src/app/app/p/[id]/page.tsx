@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -21,26 +22,34 @@ export default async function ProductPage({
   if (!product) notFound();
 
   const industry = product.industry as Industry;
+  const originalUrl = publicUrl(product.originalImageKey);
 
   return (
     <div>
-      <div className="flex items-start gap-4">
+      <Link
+        href="/app"
+        className="text-xs text-muted transition hover:text-ink"
+      >
+        ← Sản phẩm
+      </Link>
+
+      <div className="mt-3 flex items-center gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={publicUrl(product.cutoutImageKey ?? product.originalImageKey)}
           alt={product.name}
-          className="h-24 w-24 rounded-lg border border-[--color-line] object-cover"
+          className="h-16 w-16 rounded-2xl border border-line object-cover"
         />
-        <div>
-          <h1 className="text-xl font-bold">{product.name}</h1>
-          <p className="text-sm text-[--color-muted]">
-            {INDUSTRY_LABEL[industry]}
-          </p>
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-bold">{product.name}</h1>
+          <p className="text-sm text-muted">{INDUSTRY_LABEL[industry]}</p>
         </div>
       </div>
 
       <Workbench
         productId={product.id}
+        productName={product.name}
+        originalUrl={originalUrl}
         scenes={allScenes(industry).map((s) => ({
           id: s.id,
           name: s.name,

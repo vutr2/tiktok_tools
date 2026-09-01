@@ -1,4 +1,9 @@
+import { existsSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
+import { checkDatabaseUrl } from "./db-url";
+
+// Chặn lúc khởi động, không để chết giữa lúc chạy. Luật ở db-url.ts (có test).
+checkDatabaseUrl(process.env.DATABASE_URL, { envFileExists: existsSync(".env") });
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 

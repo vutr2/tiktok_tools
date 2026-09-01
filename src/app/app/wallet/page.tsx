@@ -14,12 +14,15 @@ export default async function WalletPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-bold">Ví credit</h1>
-      <p className="mt-1 text-3xl font-bold">{user.wallet?.balance ?? 0}</p>
+      <h1 className="text-2xl font-bold tracking-tight">Ví credit</h1>
+      <p className="mt-2 bg-gradient-to-r from-brand to-neon bg-clip-text text-5xl font-extrabold text-transparent">
+        {user.wallet?.balance ?? 0}
+      </p>
+      <p className="text-sm text-muted">credit còn lại</p>
 
       <Card className="mt-6">
         <div className="text-sm font-semibold">Giá</div>
-        <ul className="mt-2 space-y-1 text-sm text-[--color-muted]">
+        <ul className="mt-2 space-y-1 text-sm text-muted">
           <li>• Mô tả sàn: {CREDIT_COST.LISTING_COPY} credit</li>
           <li>• Kịch bản video: {CREDIT_COST.VIDEO_SCRIPT} credit</li>
           <li>
@@ -33,10 +36,10 @@ export default async function WalletPage() {
         {activePacks().map((pack) => (
           <Card key={pack.id}>
             <div className="font-semibold">{pack.name}</div>
-            <div className="mt-1 text-2xl font-bold">
+            <div className="mt-1 text-2xl font-bold text-ink">
               {formatVnd(pack.priceVnd)}
             </div>
-            <div className="text-sm text-[--color-muted]">
+            <div className="text-sm text-muted">
               {pack.credits} credit
             </div>
             <BuyPack packId={pack.id} />
@@ -46,28 +49,28 @@ export default async function WalletPage() {
 
       <Card className="mt-6">
         <div className="text-sm font-semibold">Lịch sử</div>
-        <ul className="mt-3 divide-y divide-[--color-line] text-sm">
+        <ul className="mt-3 divide-y divide-line text-sm">
           {transactions.map((t) => (
             <li key={t.id} className="flex justify-between py-2">
               <span>
                 <span
                   className={
-                    t.delta > 0 ? "text-emerald-700" : "text-[--color-ink]"
+                    t.delta > 0 ? "text-emerald-400" : "text-ink"
                   }
                 >
                   {t.delta > 0 ? `+${t.delta}` : t.delta}
                 </span>
-                <span className="ml-2 text-[--color-muted]">
+                <span className="ml-2 text-muted">
                   {t.note ?? t.type}
                 </span>
               </span>
-              <span className="text-[--color-muted]">
+              <span className="text-muted">
                 còn {t.balanceAfter}
               </span>
             </li>
           ))}
           {transactions.length === 0 ? (
-            <li className="py-2 text-[--color-muted]">Chưa có giao dịch nào.</li>
+            <li className="py-2 text-muted">Chưa có giao dịch nào.</li>
           ) : null}
         </ul>
       </Card>

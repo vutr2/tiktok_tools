@@ -7,7 +7,8 @@ Ba chức năng cho người bán Shopee / TikTok Shop tại Việt Nam. Không 
 2. **Mô tả sàn** — ảnh + vài dòng thông tin → tiêu đề chuẩn ký tự Shopee/TikTok +
    mô tả + hashtag.
 3. **Kịch bản video 30s** — 5 kịch bản, mỗi cái có hook 3 giây, lời thoại, gợi ý
-   cảnh quay.
+   cảnh quay — **xem thử ngay trong khung điện thoại dọc 9:16**: chữ on-screen
+   nhảy đúng giây, chạy trên chính ảnh studio vừa dựng ở bước 1.
 
 Không có: quản lý đơn, quản lý kho, chat tự động, đăng bài tự động lên sàn.
 Lý do và ranh giới: [`docs/scope.md`](docs/scope.md).
@@ -19,11 +20,16 @@ mua, cụm từ bị cấm, mẫu hook và bối cảnh ảnh đều khác nhau 
 ## Chạy thử
 
 ```bash
-cp .env.example .env       # sửa DATABASE_URL và AUTH_SECRET
+cp .env.example .env       # dán 2 chuỗi kết nối Supabase + đặt AUTH_SECRET
 npm install
-npm run db:push            # cần một Postgres đang chạy
+npm run db:push            # dựng 6 bảng
 npm run dev
 ```
+
+Database là **Supabase Postgres** (Prisma giữ nguyên, chỉ đổi chuỗi kết nối).
+Lấy `DATABASE_URL` + `DIRECT_URL` ở Dashboard > Connect > ORMs > Prisma. Sau
+`db:push` nhớ chạy `prisma/rls.sql` — không bật RLS thì 6 bảng này đọc được từ
+ngoài bằng `anon key`. Chi tiết và các bẫy khác: [`docs/supabase.md`](docs/supabase.md).
 
 Mặc định `IMAGE_PROVIDER=mock` nên chạy được ngay, không cần credential và không
 tốn tiền — toàn bộ luồng trừ credit / hoàn credit / lưu file / hiển thị đều thật,
@@ -31,7 +37,7 @@ chỉ có ảnh trả về là ảnh gốc. Sinh ảnh thật cần `GEMINI_API_
 `IMAGE_PROVIDER=gemini`; sinh text cần `ANTHROPIC_API_KEY`.
 
 ```bash
-npm test          # 42 test, không cần DB
+npm test          # 68 test, không cần DB
 npm run typecheck
 npm run economics # in bảng kinh tế đơn vị, exit 1 nếu chưa đo giá ảnh
 ```
@@ -55,10 +61,17 @@ Nguyên tắc: **trừ credit trước khi gọi API, hoàn lại nếu lỗi.**
 
 ```
 prisma/schema.prisma      6 bảng, không hơn
+prisma/rls.sql            đóng REST API của Supabase, chạy sau mỗi db:push
 src/prompts/              ★ bộ prompt theo ngành — chỗ tạo khác biệt
   <ngành>.ts              giọng, nỗi lo, cụm cấm, hook, cảnh quay, 4 bối cảnh
   types.ts                kiểu PromptPack + lintClaims (hậu kiểm cụm cấm)
+src/components/
+  script-player.tsx       ★ trình phát kịch bản 9:16 — chức năng đinh
+  account-menu.tsx        menu tài khoản + đăng xuất
 src/lib/
+  descope.ts              Descope làm cửa trước, app vẫn tự phát phiên
+src/lib/
+  timeline.ts             dòng thời gian kịch bản (seconds = thời lượng, phải cộng dồn)
   pricing.ts              ★ mọi con số tiền, một nguồn duy nhất
   credits.ts              sổ credit append-only, trừ nguyên tử
   generation.ts           ★ vòng đời trừ-trước / hoàn-khi-lỗi
@@ -80,6 +93,10 @@ scripts/
 - [ ] Sau vài trăm ảnh đầu: đối soát hoá đơn Google, điền `IMAGE_COST_VND_PER_SCENE`.
 - [ ] Đối chiếu lại giới hạn ký tự Shopee/TikTok trên Seller Center
       (`src/lib/marketplace.ts`) — sàn đổi không báo trước.
-- [ ] Đổi lưu file từ đĩa local sang S3/R2 (`src/lib/storage.ts`).
-- [ ] Thêm OTP SMS/Zalo trước bước phát cookie (`src/lib/auth.ts`) — không thêm bảng.
+- [ ] Đổi lưu file từ đĩa local sang Supabase Storage (`src/lib/storage.ts`) — trên
+      Vercel thư mục `./storage` không sống qua lần deploy, ảnh sẽ mất.
+- [ ] Lên Supabase Pro + bật PITR trước khi có doanh thu thật — `credit_transactions`
+      là sổ tiền, backup 7 ngày của free tier không đủ.
+- [ ] Bật Descope: điền `NEXT_PUBLIC_DESCOPE_PROJECT_ID` là màn đăng nhập tự đổi
+      sang flow đã xác minh email. Bỏ trống thì vẫn chạy form email như cũ.
 - [ ] Thay webhook secret dùng chung bằng chữ ký cổng thanh toán thật.

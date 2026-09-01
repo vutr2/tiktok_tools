@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
+    "@descope/nextjs-sdk": "^0.15.70",
     "@google/genai": "^2.19.0",
     "@prisma/client": "^6.16.2",
     "jose": "^6.1.0",

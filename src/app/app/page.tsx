@@ -16,33 +16,44 @@ export default async function Dashboard() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Sản phẩm của bạn</h1>
-        <Link href="/app/new" className={buttonClass}>
-          + Thêm sản phẩm
+        <h1 className="text-2xl font-bold tracking-tight">Sản phẩm</h1>
+        <Link href="/app/new" className={`${buttonClass} hidden sm:inline-flex`}>
+          ＋ Thêm sản phẩm
         </Link>
       </div>
 
       {products.length === 0 ? (
-        <p className="mt-8 rounded-xl border border-dashed border-[--color-line] p-10 text-center text-sm text-[--color-muted]">
-          Chưa có sản phẩm nào. Chụp một tấm bằng điện thoại rồi tải lên.
-        </p>
+        <div className="mt-10 rounded-3xl border border-dashed border-line bg-panel p-10 text-center">
+          <div className="text-4xl">📷</div>
+          <p className="mt-4 font-semibold">Chưa có sản phẩm nào</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
+            Chụp một tấm bằng điện thoại, đặt trên nền trơn. Phần studio để máy
+            lo.
+          </p>
+          <Link href="/app/new" className={`${buttonClass} mt-6`}>
+            ✨ Bắt đầu
+          </Link>
+        </div>
       ) : (
-        <ul className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {products.map((p) => (
             <li key={p.id}>
               <Link
                 href={`/app/p/${p.id}`}
-                className="block overflow-hidden rounded-xl border border-[--color-line] bg-white"
+                className="group block overflow-hidden rounded-2xl border border-line bg-panel transition hover:border-brand/50"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={publicUrl(p.cutoutImageKey ?? p.originalImageKey)}
-                  alt={p.name}
-                  className="aspect-square w-full object-cover"
-                />
+                <div className="relative overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={publicUrl(p.cutoutImageKey ?? p.originalImageKey)}
+                    alt={p.name}
+                    className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                </div>
                 <div className="p-3">
-                  <div className="truncate text-sm font-medium">{p.name}</div>
-                  <div className="text-xs text-[--color-muted]">
+                  <div className="truncate text-sm font-semibold">{p.name}</div>
+                  <div className="text-xs text-dim">
                     {INDUSTRY_LABEL[p.industry as Industry]}
                   </div>
                 </div>

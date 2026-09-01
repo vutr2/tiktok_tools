@@ -15,7 +15,7 @@ export default async function NewProduct() {
   return (
     <div className="max-w-2xl">
       <h1 className="text-xl font-bold">Thêm sản phẩm</h1>
-      <p className="mt-1 text-sm text-[--color-muted]">
+      <p className="mt-1 text-sm text-muted">
         Ảnh chụp bằng điện thoại là được. Càng điền đủ thông tin, mô tả và kịch
         bản càng bớt chung chung.
       </p>
