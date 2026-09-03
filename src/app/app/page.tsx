@@ -31,7 +31,7 @@ export default async function Dashboard() {
       <PageHeader title="Sản phẩm" balance={user.wallet?.balance ?? 0} />
 
       {products.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-line p-8 text-center">
+        <div className="mx-auto max-w-md rounded-3xl border border-dashed border-line p-8 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-raise text-2xl">
             📸
           </div>
@@ -46,7 +46,7 @@ export default async function Dashboard() {
         </div>
       ) : (
         <>
-          <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {products.map((p) => (
               <li key={p.id}>
                 <Link

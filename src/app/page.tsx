@@ -5,6 +5,7 @@ import { CREDIT_COST, PACKS, formatVnd } from "@/lib/pricing";
 import {
   descopeBaseUrl,
   descopeEnabled,
+  descopeFlowId,
   descopeProjectId,
 } from "@/lib/descope";
 import SignInForm from "./sign-in-form";
@@ -53,11 +54,17 @@ export default async function Home() {
           </p>
         </div>
 
-        {descopeEnabled() ? (
+        {descopeEnabled() && !descopeFlowId() ? (
+          <div className="rounded-2xl border border-brand/40 bg-brand/5 p-4 text-sm text-brand">
+            Thiếu <code>NEXT_PUBLIC_DESCOPE_FLOW_ID</code>. Đặt biến này trong
+            Environment Variables rồi deploy lại — biến NEXT_PUBLIC_ được nhúng
+            cứng lúc build nên thêm không thôi chưa đủ.
+          </div>
+        ) : descopeEnabled() ? (
           <DescopeAuth
             projectId={descopeProjectId() as string}
             baseUrl={descopeBaseUrl()}
-            flowId={process.env.NEXT_PUBLIC_DESCOPE_FLOW_ID ?? "sign-up-or-in"}
+            flowId={descopeFlowId() as string}
             bonusCredits={bonus}
           />
         ) : (

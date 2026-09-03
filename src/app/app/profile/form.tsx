@@ -112,7 +112,7 @@ export default function ProfileForm({
         <button
           type="submit"
           disabled={busy || !dirty}
-          className={`${buttonClass} w-full py-3`}
+          className={`${buttonClass} w-full py-3 sm:w-auto sm:px-8`}
         >
           {busy ? "Đang lưu..." : "Lưu thay đổi"}
         </button>

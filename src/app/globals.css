@@ -51,6 +51,9 @@
 }
 
 html {
+  /* Không màn nào được cuộn ngang. Nội dung rộng (bảng, dải chip) phải tự cuộn
+     trong khung của nó, không đẩy cả trang. */
+  overflow-x: hidden;
   background: var(--color-canvas);
   color: var(--color-ink);
   color-scheme: dark;

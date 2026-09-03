@@ -33,6 +33,18 @@ export function descopeBaseUrl(): string | undefined {
   return u ? u : undefined;
 }
 
+/**
+ * Tên flow. KHÔNG có giá trị mặc định.
+ *
+ * Trước đây thiếu biến thì rơi về "sign-up-or-in" — một cái tên đoán bừa. Trên
+ * máy có biến nên chạy, lên Vercel thiếu biến nên Descope trả `E103003 Failed
+ * getting flow`, một lỗi chẳng chỉ vào đâu cả. Thà báo thiếu cấu hình.
+ */
+export function descopeFlowId(): string | undefined {
+  const f = process.env.NEXT_PUBLIC_DESCOPE_FLOW_ID?.trim();
+  return f ? f : undefined;
+}
+
 export function descopeEnabled(): boolean {
   return descopeProjectId() !== undefined;
 }

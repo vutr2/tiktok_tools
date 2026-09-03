@@ -17,11 +17,41 @@ import type { Industry } from "@prisma/client";
 const COOKIE = "tt_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
 
+/**
+ * Khoá ký phiên.
+ *
+ * Ném AppError chứ không phải Error trần: Error trần lọt ra ngoài thành 500 kèm
+ * stack, người dùng thấy một trang vỡ còn người vận hành không biết sửa ở đâu.
+ * Phân biệt "chưa đặt" với "đặt rồi nhưng ngắn" vì hai thứ sửa khác nhau.
+ */
+export const AUTH_SECRET_MIN = 32;
+
+/** Tách riêng để test được: `secret()` chỉ chạy trong request scope của Next. */
+export function checkAuthSecret(s: string | undefined): asserts s is string {
+  if (!s) {
+    throw new AppError(
+      "AUTH_SECRET_MISSING",
+      "Chưa đặt AUTH_SECRET.\n" +
+        "  • Máy cá nhân: thêm vào .env.\n" +
+        "  • Vercel/hosting: thêm vào Environment Variables (tick cả Production " +
+        "lẫn Preview) rồi DEPLOY LẠI — biến mới không tự áp vào bản deploy cũ.\n" +
+        "  Tạo chuỗi: openssl rand -base64 48",
+      503,
+    );
+  }
+  if (s.length < AUTH_SECRET_MIN) {
+    throw new AppError(
+      "AUTH_SECRET_TOO_SHORT",
+      `AUTH_SECRET chỉ dài ${s.length} ký tự, cần tối thiểu ${AUTH_SECRET_MIN}. ` +
+        "Tạo chuỗi mới: openssl rand -base64 48",
+      503,
+    );
+  }
+}
+
 function secret(): Uint8Array {
   const s = process.env.AUTH_SECRET;
-  if (!s || s.length < 32) {
-    throw new Error("AUTH_SECRET phải có tối thiểu 32 ký tự");
-  }
+  checkAuthSecret(s);
   return new TextEncoder().encode(s);
 }
 

@@ -105,14 +105,15 @@ export default function Workbench({
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[13px] font-semibold transition ${
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[13px] font-semibold transition ${
               tab === key
                 ? "bg-gradient-to-r from-brand to-[#ff5b7f] text-white shadow-lg shadow-brand/25"
                 : "text-muted hover:text-ink"
             }`}
           >
-            <span>{icon}</span>
-            <span>{label}</span>
+            <span className="shrink-0">{icon}</span>
+            {/* Màn 320px không đủ chỗ cho cả ba nhãn — cắt gọn còn hơn tràn ngang */}
+            <span className="truncate">{label}</span>
           </button>
         ))}
       </div>
@@ -126,14 +127,14 @@ export default function Workbench({
       {/* ─────────────── Ảnh studio ─────────────── */}
       {tab === "photos" ? (
         <section className="mt-6">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold">Chọn bối cảnh</h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2 className="text-base font-bold">Chọn bối cảnh</h2>
             <span className="text-xs text-muted">
               {cost.PRODUCT_PHOTO_PER_SCENE} credit / ảnh · còn {balance}
             </span>
           </div>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {scenes.map((s) => {
               const on = picked.includes(s.id);
               return (
@@ -180,7 +181,7 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={`${buttonClass} mt-4 w-full py-3.5`}
+            className={`${buttonClass} mt-4 w-full py-3.5 sm:w-auto sm:px-7`}
           >
             {busy === "photos"
               ? "Đang dựng ảnh... (khoảng 15 giây)"
@@ -204,7 +205,7 @@ export default function Workbench({
               <p className="mt-4 text-sm font-medium text-neon">
                 ⏳ Đang dựng ảnh... (khoảng 15 giây)
               </p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                 {picked.map((id) => (
                   <div key={id}>
                     <Shimmer className="aspect-square w-full rounded-2xl" />
@@ -221,7 +222,7 @@ export default function Workbench({
 
               {/* Ảnh gốc để rộng hết khổ: đây là vế "trước", phải thấy rõ mới
                   cảm được mức chênh lệch với ảnh studio bên dưới. */}
-              <figure className="mt-3">
+              <figure className="mt-3 max-w-2xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={originalUrl}
@@ -233,7 +234,7 @@ export default function Workbench({
                 </figcaption>
               </figure>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
                 {photos.map((p) => (
                   <figure key={p.sceneId}>
                     {p.ok && p.url ? (
@@ -269,7 +270,7 @@ export default function Workbench({
               {readyPhotos.length > 0 ? (
                 <button
                   onClick={() => setTab("scripts")}
-                  className={`${buttonGhostClass} mt-5 w-full py-3.5`}
+                  className={`${buttonGhostClass} mt-5 w-full py-3.5 sm:w-auto sm:px-7`}
                 >
                   🎬 Xem kịch bản chạy trên ảnh này →
                 </button>
@@ -281,7 +282,7 @@ export default function Workbench({
 
       {/* ─────────────── Mô tả sàn ─────────────── */}
       {tab === "listing" ? (
-        <section className="mt-6">
+        <section className="mt-6 max-w-3xl">
           <button
             disabled={busy !== null}
             onClick={async () => {
@@ -291,7 +292,7 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={`${buttonClass} w-full py-3.5`}
+            className={`${buttonClass} w-full py-3.5 sm:w-auto sm:px-7`}
           >
             {busy === "listing"
               ? "Đang viết..."
@@ -322,7 +323,7 @@ export default function Workbench({
 
               <Card>
                 <Header label="Mô tả" text={listing.description} />
-                <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-ink">
+                <pre className="mt-2 max-w-prose whitespace-pre-wrap font-sans text-sm leading-relaxed text-ink">
                   {listing.description}
                 </pre>
                 {listing.bulletPoints.length > 0 ? (
@@ -395,7 +396,7 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={`${buttonClass} w-full py-3.5`}
+            className={`${buttonClass} w-full py-3.5 sm:w-auto sm:px-7`}
           >
             {busy === "scripts"
               ? "Đang viết kịch bản..."
