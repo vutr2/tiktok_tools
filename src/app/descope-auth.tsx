@@ -12,6 +12,32 @@ import { useRouter } from "next/navigation";
 import { AuthProvider, Descope } from "@descope/nextjs-sdk";
 import { getRefreshToken, getSessionToken } from "@descope/nextjs-sdk/client";
 
+/** Dịch lỗi Descope sang việc cụ thể cần làm, thay vì đọc mã cho người dùng nghe. */
+function describeDescopeError(d?: {
+  errorCode?: string;
+  errorDescription?: string;
+  errorMessage?: string;
+}): string {
+  const detail = d?.errorDescription || d?.errorMessage || "";
+  const code = d?.errorCode ?? "";
+  const suffix = code || detail ? ` (${[code, detail].filter(Boolean).join(": ")})` : "";
+
+  // Hai nguyên nhân chiếm gần hết số ca khi mới cắm Descope lần đầu.
+  if (/redirect|url|origin|domain/i.test(detail + code)) {
+    return (
+      "Descope chặn địa chỉ này. Vào Descope Console > Project Settings > " +
+      `Approved domains, thêm đúng địa chỉ đang mở trong trình duyệt.${suffix}`
+    );
+  }
+  if (/flow|not found|missing/i.test(detail + code)) {
+    return (
+      "Không chạy được flow. Kiểm tra Descope Console > Flows: flow phải tồn " +
+      `tại và đã publish.${suffix}`
+    );
+  }
+  return `Xác thực không thành công${suffix}. Xem thêm ở Console trình duyệt.`;
+}
+
 export default function DescopeAuth({
   projectId,
   baseUrl,
@@ -96,9 +122,15 @@ export default function DescopeAuth({
           flowId={flowId}
           theme="dark"
           onSuccess={(e) => exchange(e.detail)}
-          onError={() =>
-            setError("Xác thực không thành công. Thử lại giúp tôi.")
-          }
+          onError={(e) => {
+            // Đừng nuốt lỗi: Descope nói rõ sai chỗ nào, còn thông báo chung
+            // chung thì không ai lần ra được.
+            const d = e.detail as
+              | { errorCode?: string; errorDescription?: string; errorMessage?: string }
+              | undefined;
+            console.error("[descope] onError:", d);
+            setError(describeDescopeError(d));
+          }}
         />
       </AuthProvider>
 
