@@ -93,7 +93,7 @@ export default function SignInForm({
 
       <form onSubmit={submit} className="mt-5 space-y-4">
         <label className="block">
-          <span className="mb-1.5 block text-sm font-medium">Email</span>
+          <span className="mb-1.5 block text-sm font-medium">Email của bạn</span>
           <input
             type="email"
             required
@@ -109,7 +109,7 @@ export default function SignInForm({
         {mode === "register" ? (
           <div className="animate-rise">
             <span className="mb-2 block text-sm font-medium">
-              Bạn bán ngành gì?
+              Ngành hàng kinh doanh chính
             </span>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {industries.map((opt) => (

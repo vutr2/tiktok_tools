@@ -112,6 +112,18 @@ export default function ScriptPlayer({
 
   return (
     <div className="mt-6">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-sm text-muted">← Trở lại kịch bản</span>
+        {/* Nhãn nói đúng việc nó làm. App chưa có chỗ lưu kịch bản (đúng 6 bảng),
+            nên không đặt nút "Lưu" rồi chẳng lưu gì. */}
+        <button
+          onClick={() => navigator.clipboard?.writeText(asText(script, segments))}
+          className="shrink-0 text-sm font-medium text-neon transition hover:opacity-80"
+        >
+          Chép kịch bản
+        </button>
+      </div>
+
       {/* Chọn 1 trong 5 kịch bản */}
       <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {scripts.map((s, i) => (
@@ -297,63 +309,56 @@ export default function ScriptPlayer({
             >
               {total.toFixed(0)}s
             </span>
-            <button
-              onClick={() =>
-                navigator.clipboard?.writeText(asText(script, segments))
-              }
-              className="ml-auto rounded-lg border border-line bg-raise px-3 py-1.5 text-xs font-medium transition hover:border-dim"
-            >
-              Chép kịch bản
-            </button>
           </div>
 
-          <ol className="mt-4 space-y-1.5">
+          <h3 className="mt-5 text-base font-bold">Dòng thời gian kịch bản</h3>
+          <ol className="mt-3 space-y-2">
             {segments.map((s, i) => (
               <li key={i}>
                 <button
                   onClick={() => seek(s.start)}
-                  className={`flex w-full gap-3 rounded-xl border p-3 text-left transition ${
+                  className={`block w-full rounded-xl border p-3.5 text-left transition ${
                     i === active
-                      ? "border-brand/60 bg-brand-soft"
+                      ? "border-brand bg-brand-soft"
                       : "border-line bg-panel hover:border-dim"
                   }`}
                 >
-                  <span className="w-11 shrink-0 pt-0.5 text-xs font-bold tabular-nums text-muted">
-                    {mmss(s.start)}
-                  </span>
-                  <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-3">
                     <span className="flex items-center gap-2">
                       <span
-                        className={`text-[10px] font-bold tracking-wide ${
-                          s.kind === "hook" ? "text-brand" : "text-dim"
+                        className={`text-[11px] font-bold tracking-wide ${
+                          s.kind === "hook" ? "text-brand" : "text-muted"
                         }`}
                       >
                         {s.label}
                       </span>
-                      <span className="text-[10px] text-dim">{s.duration}s</span>
+                      <span className="text-[11px] text-dim">• {s.duration}s</span>
                     </span>
-                    <span className="mt-0.5 block text-sm text-ink">
-                      {s.voiceover}
+                    <span className="shrink-0 text-xs tabular-nums text-dim">
+                      {mmss(s.start)}
                     </span>
-                    <span className="mt-1 block text-xs text-muted">
-                      Chữ: {s.onScreenText}
-                    </span>
-                    <span className="block text-xs text-dim">🎬 {s.shot}</span>
+                  </span>
+                  <span className="mt-1.5 block text-sm leading-snug text-ink">
+                    Dialogue: &ldquo;{s.voiceover}&rdquo;
+                  </span>
+                  <span className="mt-1 block text-xs leading-snug text-dim">
+                    Note: {s.shot}
                   </span>
                 </button>
               </li>
             ))}
           </ol>
 
-          <div className="mt-2 rounded-xl border border-line bg-panel p-3 text-sm">
-            <span className="text-xs font-bold text-brand">CTA</span>{" "}
-            <span className="text-ink">{script.cta}</span>
+          <div className="mt-3 rounded-xl border border-neon/40 bg-neon/5 p-3.5 text-sm font-medium text-neon">
+            📌 {script.cta}
           </div>
 
           {script.warnings.length > 0 ? (
-            <ul className="mt-3 space-y-1 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-300">
+            <ul className="mt-3 space-y-1.5 rounded-xl border border-brand/40 bg-brand/5 p-3.5 text-xs leading-snug text-muted">
               {script.warnings.map((w, k) => (
-                <li key={k}>⚠ {w}</li>
+                <li key={k}>
+                  <span className="font-semibold text-brand">🚨 {w}</span>
+                </li>
               ))}
             </ul>
           ) : null}

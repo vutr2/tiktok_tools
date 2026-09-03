@@ -69,6 +69,7 @@ export const THOI_TRANG: PromptPack = {
   scenes: [
     {
       id: "seamless_studio",
+      emoji: "📸",
       name: "Phông liền studio",
       useCase: "Ảnh bìa chuẩn sàn — nền trắng sạch, sàn thích, dễ duyệt.",
       prompt:
@@ -79,6 +80,7 @@ export const THOI_TRANG: PromptPack = {
     },
     {
       id: "concrete_loft",
+      emoji: "🧱",
       name: "Loft bê tông",
       useCase: "Ảnh phong cách cho đồ street / oversize, hợp quảng cáo TikTok.",
       prompt:
@@ -89,6 +91,7 @@ export const THOI_TRANG: PromptPack = {
     },
     {
       id: "wood_hanger",
+      emoji: "🪝",
       name: "Móc gỗ tường trung tính",
       useCase: "Ảnh phụ cho đồ công sở / basic, làm nổi chất vải.",
       prompt:
@@ -99,6 +102,7 @@ export const THOI_TRANG: PromptPack = {
     },
     {
       id: "flatlay_styled",
+      emoji: "👗",
       name: "Flatlay phối đồ",
       useCase: "Cho người mua thấy phối với gì — tăng giá trị đơn hàng.",
       prompt:

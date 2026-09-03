@@ -14,6 +14,8 @@ export type PhotoScene = {
   id: string;
   /** Tên hiển thị cho người bán, tiếng Việt. */
   name: string;
+  /** Một emoji gợi chất liệu bối cảnh — người bán nhận ra thẻ trước khi đọc chữ. */
+  emoji: string;
   /** Dùng ảnh này ở đâu — người bán cần biết để chọn, không chọn bừa 4 cái. */
   useCase: string;
   /** Prompt cho model ảnh. Viết tiếng Anh vì model ảnh hiểu tiếng Anh tốt hơn. */

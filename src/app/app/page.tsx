@@ -4,6 +4,19 @@ import { prisma } from "@/lib/db";
 import { publicUrl } from "@/lib/storage";
 import { INDUSTRY_LABEL, type Industry } from "@/lib/industries";
 import { buttonClass } from "@/components/ui";
+import PageHeader from "@/components/page-header";
+
+/** Thời gian tương đối — người bán quan tâm "vừa xong" hơn là ngày giờ đầy đủ. */
+function relativeTime(d: Date): string {
+  const mins = Math.floor((Date.now() - d.getTime()) / 60_000);
+  if (mins < 5) return "Vừa tạo xong";
+  if (mins < 60) return `${mins} phút trước`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} ngày trước`;
+  return new Intl.DateTimeFormat("vi-VN", { dateStyle: "short" }).format(d);
+}
 
 export default async function Dashboard() {
   const user = await requireUser();
@@ -15,52 +28,62 @@ export default async function Dashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Sản phẩm</h1>
-        <Link href="/app/new" className={`${buttonClass} hidden sm:inline-flex`}>
-          ＋ Thêm sản phẩm
-        </Link>
-      </div>
+      <PageHeader title="Sản phẩm" balance={user.wallet?.balance ?? 0} />
 
       {products.length === 0 ? (
-        <div className="mt-10 rounded-3xl border border-dashed border-line bg-panel p-10 text-center">
-          <div className="text-4xl">📷</div>
+        <div className="rounded-3xl border border-dashed border-line p-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-raise text-2xl">
+            📸
+          </div>
           <p className="mt-4 font-semibold">Chưa có sản phẩm nào</p>
-          <p className="mx-auto mt-1 max-w-xs text-sm text-muted">
+          <p className="mx-auto mt-1.5 max-w-[17rem] text-sm text-muted">
             Chụp một tấm bằng điện thoại, đặt trên nền trơn. Phần studio để máy
             lo.
           </p>
-          <Link href="/app/new" className={`${buttonClass} mt-6`}>
+          <Link href="/app/new" className={`${buttonClass} mt-6 w-full py-3`}>
             ✨ Bắt đầu
           </Link>
         </div>
       ) : (
-        <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {products.map((p) => (
-            <li key={p.id}>
-              <Link
-                href={`/app/p/${p.id}`}
-                className="group block overflow-hidden rounded-2xl border border-line bg-panel transition hover:border-brand/50"
-              >
-                <div className="relative overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={publicUrl(p.cutoutImageKey ?? p.originalImageKey)}
-                    alt={p.name}
-                    className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                </div>
-                <div className="p-3">
-                  <div className="truncate text-sm font-semibold">{p.name}</div>
-                  <div className="text-xs text-dim">
-                    {INDUSTRY_LABEL[p.industry as Industry]}
+        <>
+          <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {products.map((p) => (
+              <li key={p.id}>
+                <Link
+                  href={`/app/p/${p.id}`}
+                  className="group block overflow-hidden rounded-2xl border border-line bg-panel transition hover:border-brand/50"
+                >
+                  <div className="relative overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={publicUrl(p.cutoutImageKey ?? p.originalImageKey)}
+                      alt={p.name}
+                      className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                    {/* Chip ngành đè lên ảnh — nhận ra ngay không cần đọc chữ dưới */}
+                    <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[11px] font-medium text-ink backdrop-blur-sm">
+                      {INDUSTRY_LABEL[p.industry as Industry]}
+                    </span>
                   </div>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  <div className="p-3">
+                    <div className="truncate text-sm font-semibold">
+                      {p.name}
+                    </div>
+                    <div className="mt-0.5 text-xs text-dim">
+                      {relativeTime(p.createdAt)}
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-6 flex justify-center">
+            <Link href="/app/new" className={`${buttonClass} px-6 py-3`}>
+              ＋ Thêm sản phẩm
+            </Link>
+          </div>
+        </>
       )}
     </div>
   );

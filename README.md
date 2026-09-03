@@ -37,7 +37,7 @@ chỉ có ảnh trả về là ảnh gốc. Sinh ảnh thật cần `GEMINI_API_
 `IMAGE_PROVIDER=gemini`; sinh text cần `ANTHROPIC_API_KEY`.
 
 ```bash
-npm test          # 68 test, không cần DB
+npm test          # 81 test, không cần DB
 npm run typecheck
 npm run economics # in bảng kinh tế đơn vị, exit 1 nếu chưa đo giá ảnh
 ```
@@ -60,8 +60,8 @@ Nguyên tắc: **trừ credit trước khi gọi API, hoàn lại nếu lỗi.**
 ## Bản đồ code
 
 ```
-prisma/schema.prisma      6 bảng, không hơn
-prisma/rls.sql            đóng REST API của Supabase, chạy sau mỗi db:push
+prisma/schema.prisma      12 bảng — 6 lõi nghiệp vụ + 6 vận hành
+prisma/rls.sql            ★ đóng REST API Supabase — CHẠY LẠI sau mỗi db:push
 src/prompts/              ★ bộ prompt theo ngành — chỗ tạo khác biệt
   <ngành>.ts              giọng, nỗi lo, cụm cấm, hook, cảnh quay, 4 bối cảnh
   types.ts                kiểu PromptPack + lintClaims (hậu kiểm cụm cấm)
@@ -77,8 +77,11 @@ src/lib/
   generation.ts           ★ vòng đời trừ-trước / hoàn-khi-lỗi
   features.ts             3 chức năng
   marketplace.ts          giới hạn ký tự sàn + kiểm tiêu đề
-  ai/claude.ts            sinh text (structured output + hậu kiểm)
-  ai/image.ts             provider ảnh (mock | gemini "nano banana")
+  ai/text.ts              ★ chọn provider text (claude | deepseek)
+  ai/text-core.ts         schema + hậu kiểm dùng chung cho mọi provider
+  ai/claude.ts            Claude Opus 5 (structured output ràng buộc schema)
+  ai/deepseek.ts          DeepSeek V4 (json_object + tự kiểm Zod + retry)
+  ai/image.ts             provider ảnh (mock | gemini "nano banana" | kling)
 scripts/
   unit-economics.ts       npm run economics
   probe-image-cost.ts     npm run probe:image-cost — đo giá thật

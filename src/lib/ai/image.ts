@@ -224,6 +224,250 @@ function wrapGeminiError(err: unknown): ProviderError {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Kling (Kuaishou)
+// ---------------------------------------------------------------------------
+
+/**
+ * Kling khác Gemini ở ba điểm phải xử lý:
+ *
+ *   1. BẤT ĐỒNG BỘ — POST tạo task, rồi phải hỏi lại tới khi xong.
+ *   2. Trả về URL ảnh, không phải base64. Phải tải về mới có Buffer.
+ *   3. Không trả token đã dùng, nên KHÔNG suy ra được giá vốn mỗi lần gọi.
+ *      Giá chỉ có khi bạn điền IMAGE_COST_VND_PER_SCENE từ hoá đơn thật.
+ *      Cố ý để null thay vì bịa số — xem luật ở đầu src/lib/pricing.ts.
+ *
+ * Cảnh báo về chất lượng: đây là model khuếch tán, nó VẼ LẠI chủ thể. Ảnh sản
+ * phẩm sống chết ở chỗ giữ nguyên nhãn mác và chữ trên bao bì. Phải chạy đối
+ * chứng với Gemini trên đúng hàng của bạn rồi mới đổi mặc định.
+ */
+
+/** Kling không nhận "4:5" — đúng cái bẫy của Gemini. Đã dò trực tiếp trên API. */
+const KLING_ASPECT: Record<string, string> = {
+  "1:1": "1:1",
+  "4:5": "3:4",
+  "3:4": "3:4",
+  "2:3": "2:3",
+  "9:16": "9:16",
+  "16:9": "16:9",
+  "4:3": "4:3",
+};
+
+export function toKlingAspect(aspect: string): string {
+  return KLING_ASPECT[aspect] ?? "1:1";
+}
+
+type KlingTask = {
+  code: number;
+  message: string;
+  data?: {
+    task_id?: string;
+    task_status?: string;
+    task_status_msg?: string;
+    task_result?: { images?: { url?: string }[] };
+  };
+};
+
+const KLING_POLL_MS = 2_000;
+const KLING_TIMEOUT_MS = 180_000;
+
+class KlingImageProvider implements ImageProvider {
+  readonly name = "kling";
+
+  private model = process.env.KLING_IMAGE_MODEL ?? "kling-v2-1";
+
+  private base(): string {
+    return (
+      process.env.KLING_BASE_URL?.replace(/\/+$/, "") ??
+      "https://api.klingai.com"
+    );
+  }
+
+  private key(): string {
+    const k = process.env.KLING_API_KEY;
+    if (!k) {
+      throw new ProviderError("kling", "Chưa cấu hình KLING_API_KEY.", false);
+    }
+    return k;
+  }
+
+  async removeBackground(input: ImageBlob): Promise<ImageResult> {
+    return this.run({
+      subject: input,
+      prompt:
+        "The exact same product, unchanged, isolated on a plain pure white studio background. " +
+        "Preserve every detail of the product: shape, colour, material, and all text, logos and labels. " +
+        "Do not redraw or restyle the product. Clean precise edges.",
+      negative:
+        "background clutter, props, hands, people, text overlay, watermark, changed label, distorted logo",
+      aspect: "1:1",
+    });
+  }
+
+  async compose(args: {
+    subject: ImageBlob;
+    prompt: string;
+    negative: string;
+    aspect: string;
+  }): Promise<ImageResult> {
+    return this.run(args);
+  }
+
+  private async run(args: {
+    subject: ImageBlob;
+    prompt: string;
+    negative: string;
+    aspect: string;
+  }): Promise<ImageResult> {
+    const taskId = await this.createTask(args);
+    const url = await this.awaitImage(taskId);
+    const blob = await this.download(url);
+
+    // `this.model` không nằm trong IMAGE_MODELS nên imageCost() chỉ trả số khi
+    // đã có IMAGE_COST_VND_PER_SCENE từ hoá đơn. Không có thì null, đúng ý đồ.
+    const quote = imageCost({ model: this.model, outputTokens: null });
+
+    return {
+      ...blob,
+      costVnd: quote.costVnd,
+      costSource: quote.source,
+      jobId: taskId,
+    };
+  }
+
+  private async createTask(args: {
+    subject: ImageBlob;
+    prompt: string;
+    negative: string;
+    aspect: string;
+  }): Promise<string> {
+    const json = await this.call<KlingTask>("POST", "/v1/images/generations", {
+      model_name: this.model,
+      prompt: args.prompt,
+      negative_prompt: args.negative,
+      image: args.subject.data.toString("base64"),
+      // "subject" bảo Kling bám lấy chủ thể trong ảnh tham chiếu thay vì chỉ
+      // lấy bố cục. Đây là thứ gần nhất với "giữ nguyên sản phẩm".
+      image_reference: "subject",
+      image_fidelity: 0.9,
+      aspect_ratio: toKlingAspect(args.aspect),
+      n: 1,
+    });
+
+    const id = json.data?.task_id;
+    if (!id) {
+      throw new ProviderError("kling", `Không tạo được task: ${json.message}`, true);
+    }
+    return id;
+  }
+
+  private async awaitImage(taskId: string): Promise<string> {
+    const deadline = Date.now() + KLING_TIMEOUT_MS;
+
+    while (Date.now() < deadline) {
+      const json = await this.call<KlingTask>(
+        "GET",
+        `/v1/images/generations/${taskId}`,
+      );
+      const status = json.data?.task_status;
+
+      if (status === "succeed") {
+        const url = json.data?.task_result?.images?.[0]?.url;
+        if (!url) {
+          throw new ProviderError("kling", "Task xong nhưng không có ảnh.", true);
+        }
+        return url;
+      }
+      if (status === "failed") {
+        throw new ProviderError(
+          "kling",
+          `Sinh ảnh thất bại: ${json.data?.task_status_msg ?? "không rõ lý do"}`,
+          true,
+        );
+      }
+      await delay(KLING_POLL_MS);
+    }
+
+    throw new ProviderError(
+      "kling",
+      `Quá ${KLING_TIMEOUT_MS / 1000}s chưa xong. Task ${taskId} vẫn có thể chạy tiếp bên Kling.`,
+      true,
+    );
+  }
+
+  private async download(url: string): Promise<ImageBlob> {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new ProviderError("kling", `Tải ảnh về lỗi (${res.status}).`, true);
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    return { data: buf, mime: res.headers.get("content-type") ?? "image/png" };
+  }
+
+  private async call<T>(
+    method: "GET" | "POST",
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.base()}${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${this.key()}`,
+          "Content-Type": "application/json",
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (err) {
+      throw new ProviderError(
+        "kling",
+        `Không gọi được Kling: ${err instanceof Error ? err.message : String(err)}`,
+        true,
+      );
+    }
+
+    const json = (await res.json().catch(() => null)) as
+      | (T & { code?: number; message?: string })
+      | null;
+
+    if (!res.ok || (json?.code !== undefined && json.code !== 0)) {
+      throw klingError(res.status, json?.code, json?.message);
+    }
+    return json as T;
+  }
+}
+
+/** Mã lỗi Kling — dò trực tiếp trên API, không đoán từ tài liệu. */
+function klingError(
+  httpStatus: number,
+  code?: number,
+  message?: string,
+): ProviderError {
+  // 1102 = hết số dư. Retry vô nghĩa, và đây là lỗi PHẢI hoàn credit cho người dùng.
+  if (code === 1102) {
+    return new ProviderError(
+      "kling",
+      "Tài khoản Kling hết số dư. Nạp thêm ở kling.ai/dev rồi thử lại.",
+      false,
+    );
+  }
+  if (code === 1000 || code === 1001 || httpStatus === 401) {
+    return new ProviderError("kling", "KLING_API_KEY không hợp lệ.", false);
+  }
+  if (code === 1201) {
+    return new ProviderError("kling", `Tham số sai: ${message}`, false);
+  }
+  if (httpStatus === 429) {
+    return new ProviderError("kling", "Kling đang quá tải, thử lại sau.", true);
+  }
+  return new ProviderError(
+    "kling",
+    `Lỗi Kling (${httpStatus}/${code ?? "?"}): ${message ?? "không rõ"}`,
+    httpStatus >= 500,
+  );
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -235,6 +479,8 @@ export function imageProvider(): ImageProvider {
   switch (name) {
     case "gemini":
       return new GeminiImageProvider();
+    case "kling":
+      return new KlingImageProvider();
     case "mock":
       return new MockProvider();
     default:

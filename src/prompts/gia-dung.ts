@@ -69,6 +69,7 @@ export const GIA_DUNG: PromptPack = {
   scenes: [
     {
       id: "kitchen_counter",
+      emoji: "🍳",
       name: "Mặt bếp hiện đại",
       useCase: "Ảnh chính cho đồ bếp — người mua hình dung ngay đặt ở đâu.",
       prompt:
@@ -79,6 +80,7 @@ export const GIA_DUNG: PromptPack = {
     },
     {
       id: "living_shelf",
+      emoji: "🛋️",
       name: "Kệ phòng khách tối giản",
       useCase: "Đồ trang trí, đồ lưu trữ — bán bằng cảm giác nhà gọn.",
       prompt:
@@ -89,6 +91,7 @@ export const GIA_DUNG: PromptPack = {
     },
     {
       id: "white_cyclo",
+      emoji: "⬜",
       name: "Phông trắng vô cực",
       useCase: "Ảnh bìa chuẩn sàn — nền trắng tinh, đúng yêu cầu duyệt của Shopee.",
       prompt:
@@ -99,6 +102,7 @@ export const GIA_DUNG: PromptPack = {
     },
     {
       id: "dining_morning",
+      emoji: "🌅",
       name: "Bàn ăn gỗ buổi sáng",
       useCase: "Ảnh cảm xúc cho đồ ăn uống, ly cốc, hộp đựng.",
       prompt:

@@ -29,11 +29,18 @@ export async function PATCH(req: Request) {
       throw new AppError("INVALID_INDUSTRY", "Ngành hàng không hợp lệ", 400);
     }
 
+    // PATCH: chỉ đụng vào trường CÓ trong body.
+    // Trước đây `clean(undefined)` trả null nên một PATCH chỉ gửi {industry}
+    // (đúng thứ màn chọn ngành gửi) sẽ xoá trắng tên và số điện thoại đã lưu.
     const updated = await prisma.user.update({
       where: { id: user.id },
       data: {
-        name: clean(body.name, MAX_NAME, "Tên"),
-        phone: clean(body.phone, MAX_PHONE, "Số điện thoại"),
+        ...(body.name !== undefined
+          ? { name: clean(body.name, MAX_NAME, "Tên") }
+          : {}),
+        ...(body.phone !== undefined
+          ? { phone: clean(body.phone, MAX_PHONE, "Số điện thoại") }
+          : {}),
         ...(body.industry !== undefined ? { industry: body.industry } : {}),
       },
     });

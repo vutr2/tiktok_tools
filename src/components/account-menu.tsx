@@ -60,32 +60,31 @@ export default function AccountMenu({
         >
           <div className="border-b border-line p-4">
             <div className="truncate text-sm font-semibold">{email}</div>
-            <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-              {industryLabel ? <span>{industryLabel}</span> : null}
-              <span className="text-dim">·</span>
-              <span className="text-neon">◈ {balance} credit</span>
+            <div className="mt-1 space-y-0.5 text-xs text-muted">
+              {industryLabel ? <div>Ngành: {industryLabel}</div> : null}
+              <div className="text-neon">Số dư: {balance} credit</div>
             </div>
           </div>
 
-          <div className="p-1.5">
+          <div className="p-1.5 text-sm">
             <Link
               href="/app/profile"
               onClick={() => setOpen(false)}
-              className="block rounded-xl px-3 py-2.5 text-sm transition hover:bg-raise"
+              className="block rounded-xl px-3 py-2.5 transition hover:bg-raise"
             >
-              👤 Hồ sơ
+              👤 Hồ sơ cá nhân
             </Link>
             <Link
               href="/app/wallet"
               onClick={() => setOpen(false)}
-              className="block rounded-xl px-3 py-2.5 text-sm transition hover:bg-raise"
+              className="block rounded-xl px-3 py-2.5 transition hover:bg-raise"
             >
-              ◈ Ví credit
+              ◈ Ví credit của bạn
             </Link>
             <button
               onClick={signOut}
               disabled={busy}
-              className="block w-full rounded-xl px-3 py-2.5 text-left text-sm text-brand transition hover:bg-brand-soft disabled:opacity-50"
+              className="block w-full rounded-xl px-3 py-2.5 text-left font-medium text-brand transition hover:bg-brand-soft disabled:opacity-50"
             >
               {busy ? "Đang thoát..." : "↪ Đăng xuất"}
             </button>

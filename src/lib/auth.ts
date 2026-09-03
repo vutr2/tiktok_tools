@@ -6,7 +6,8 @@
  * một bước xác thực trước khi phát cookie.
  */
 
-import { cookies } from "next/headers";
+import { createHash } from "node:crypto";
+import { cookies, headers } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { prisma } from "./db";
 import { credit, ensureWallet } from "./credits";
@@ -135,13 +136,43 @@ async function grantSignupBonus(userId: string, isNew: boolean) {
   });
 }
 
-/** Phát cookie phiên của app. Đây là nguồn phiên duy nhất, kể cả khi dùng Descope. */
+/**
+ * Lưu HASH của token, không lưu token thô.
+ *
+ * Rò rỉ database thì kẻ lấy được bảng `sessions` cũng không dựng lại được phiên
+ * nào — họ có hash, không có token.
+ */
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/** Bao lâu mới ghi lại lastSeenAt. Ghi mỗi request là một lượt UPDATE mỗi lần tải trang. */
+const TOUCH_EVERY_MS = 5 * 60_000;
+
+/**
+ * Phát cookie phiên của app, và ghi một dòng `sessions` đi kèm.
+ *
+ * Dòng đó là thứ khiến "đăng xuất" có thật: JWT một mình không thu hồi được,
+ * bị đánh cắp là dùng tới lúc hết hạn và không ai chặn nổi.
+ */
 async function issueSession(userId: string) {
   const token = await new SignJWT({ sub: userId })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
     .sign(secret());
+
+  const h = await headers();
+  await prisma.session.create({
+    data: {
+      userId,
+      tokenHash: hashToken(token),
+      expiresAt: new Date(Date.now() + MAX_AGE * 1000),
+      userAgent: h.get("user-agent")?.slice(0, 300) ?? null,
+      // Sau proxy/CDN thì IP thật nằm ở x-forwarded-for, lấy phần tử đầu.
+      ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    },
+  });
 
   const jar = await cookies();
   jar.set(COOKIE, token, {
@@ -155,16 +186,56 @@ async function issueSession(userId: string) {
 
 export async function signOut() {
   const jar = await cookies();
+  const token = jar.get(COOKIE)?.value;
+
+  // Thu hồi phía server TRƯỚC khi xoá cookie: xoá cookie chỉ làm trình duyệt
+  // quên token, bản sao đã bị đánh cắp thì vẫn dùng được.
+  if (token) {
+    await prisma.session.updateMany({
+      where: { tokenHash: hashToken(token), revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
   jar.delete(COOKIE);
+}
+
+/** Đăng xuất khỏi MỌI thiết bị. Dùng khi nghi tài khoản bị chiếm. */
+export async function revokeAllSessions(userId: string) {
+  const { count } = await prisma.session.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  return count;
 }
 
 export async function currentUserId(): Promise<string | null> {
   const jar = await cookies();
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
+
   try {
+    // 1. Chữ ký hợp lệ và chưa hết hạn theo chính JWT.
     const { payload } = await jwtVerify(token, secret());
-    return typeof payload.sub === "string" ? payload.sub : null;
+    if (typeof payload.sub !== "string") return null;
+
+    // 2. Phiên còn sống theo server. Đây là bước JWT một mình không làm được:
+    //    thêm một truy vấn mỗi request, đổi lấy khả năng thu hồi.
+    const session = await prisma.session.findUnique({
+      where: { tokenHash: hashToken(token) },
+      select: { id: true, userId: true, revokedAt: true, expiresAt: true, lastSeenAt: true },
+    });
+    if (!session || session.revokedAt || session.expiresAt <= new Date()) {
+      return null;
+    }
+
+    if (Date.now() - session.lastSeenAt.getTime() > TOUCH_EVERY_MS) {
+      await prisma.session.update({
+        where: { id: session.id },
+        data: { lastSeenAt: new Date() },
+      });
+    }
+
+    return session.userId;
   } catch {
     return null;
   }

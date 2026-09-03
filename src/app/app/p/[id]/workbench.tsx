@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Badge, buttonClass, buttonGhostClass, Card, Shimmer } from "@/components/ui";
 import ScriptPlayer, { type PlayerScript } from "@/components/script-player";
 
-type Scene = { id: string; name: string; useCase: string };
+type Scene = { id: string; name: string; emoji: string; useCase: string };
 
 type Tab = "photos" | "listing" | "scripts";
 
@@ -99,20 +99,20 @@ export default function Workbench({
 
   return (
     <div className="mt-6">
-      {/* Tab kiểu app, không phải kiểu tài liệu */}
-      <div className="flex items-center gap-1 rounded-2xl border border-line bg-panel p-1">
+      {/* Tab dạng viên: tab đang mở tô gradient, đủ tương phản để thấy ngay */}
+      <div className="flex items-center gap-1.5 rounded-2xl border border-line bg-panel p-1.5">
         {TABS.map(([key, icon, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[13px] font-semibold transition ${
               tab === key
-                ? "bg-raise text-ink shadow-sm"
+                ? "bg-gradient-to-r from-brand to-[#ff5b7f] text-white shadow-lg shadow-brand/25"
                 : "text-muted hover:text-ink"
             }`}
           >
             <span>{icon}</span>
-            <span className="hidden sm:inline">{label}</span>
+            <span>{label}</span>
           </button>
         ))}
       </div>
@@ -144,26 +144,27 @@ export default function Workbench({
                       on ? prev.filter((x) => x !== s.id) : [...prev, s.id],
                     )
                   }
-                  className={`flex gap-3 rounded-2xl border p-4 text-left transition ${
+                  className={`rounded-2xl border p-3.5 text-left transition ${
                     on
                       ? "border-brand bg-brand-soft"
                       : "border-line bg-panel hover:border-dim"
                   }`}
                 >
-                  <span
-                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-[11px] ${
-                      on
-                        ? "border-brand bg-brand text-white"
-                        : "border-line text-transparent"
-                    }`}
-                  >
-                    ✓
-                  </span>
-                  <span>
-                    <span className="block text-sm font-semibold">{s.name}</span>
-                    <span className="mt-1 block text-xs text-muted">
-                      {s.useCase}
+                  <span className="flex items-start justify-between">
+                    <span className="text-xl leading-none">{s.emoji}</span>
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-md border text-[11px] ${
+                        on
+                          ? "border-brand bg-brand text-white"
+                          : "border-line text-transparent"
+                      }`}
+                    >
+                      ✓
                     </span>
+                  </span>
+                  <span className="mt-2.5 block text-sm font-bold">{s.name}</span>
+                  <span className="mt-1 block text-xs leading-snug text-dim">
+                    {s.useCase}
                   </span>
                 </button>
               );
@@ -179,63 +180,81 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={`${buttonClass} mt-5 w-full sm:w-auto`}
+            className={`${buttonClass} mt-4 w-full py-3.5`}
           >
             {busy === "photos"
-              ? "Đang dựng ảnh..."
+              ? "Đang dựng ảnh... (khoảng 15 giây)"
               : `✨ Dựng ${picked.length} ảnh · ${photoCost} credit`}
           </button>
 
           {busy === "photos" ? (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {picked.map((id) => (
-                <Shimmer key={id} className="aspect-square w-full" />
-              ))}
+            <div className="mt-5">
+              <div className="flex flex-wrap gap-2">
+                {scenes
+                  .filter((s) => picked.includes(s.id))
+                  .map((s) => (
+                    <span
+                      key={s.id}
+                      className="rounded-full border border-line bg-panel px-3 py-1.5 text-xs text-muted"
+                    >
+                      {s.emoji} {s.name}
+                    </span>
+                  ))}
+              </div>
+              <p className="mt-4 text-sm font-medium text-neon">
+                ⏳ Đang dựng ảnh... (khoảng 15 giây)
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {picked.map((id) => (
+                  <div key={id}>
+                    <Shimmer className="aspect-square w-full rounded-2xl" />
+                    <Shimmer className="mt-2 h-2.5 w-2/5 rounded-full" />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : null}
 
           {photos ? (
-            <div className="mt-8">
-              <h3 className="text-sm font-semibold">Trước &amp; sau</h3>
-              <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <figure className="overflow-hidden rounded-2xl border border-line bg-panel">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={originalUrl}
-                    alt="Ảnh gốc"
-                    className="aspect-square w-full object-cover opacity-70"
-                  />
-                  <figcaption className="p-3 text-xs text-muted">
-                    Ảnh bạn chụp
-                  </figcaption>
-                </figure>
+            <div className="mt-7">
+              <h3 className="text-base font-bold">Trước &amp; sau</h3>
 
+              {/* Ảnh gốc để rộng hết khổ: đây là vế "trước", phải thấy rõ mới
+                  cảm được mức chênh lệch với ảnh studio bên dưới. */}
+              <figure className="mt-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={originalUrl}
+                  alt="Ảnh bạn chụp"
+                  className="aspect-[16/9] w-full rounded-2xl object-cover"
+                />
+                <figcaption className="mt-2 text-xs text-muted">
+                  📸 Ảnh bạn chụp (gốc)
+                </figcaption>
+              </figure>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
                 {photos.map((p) => (
-                  <figure
-                    key={p.sceneId}
-                    className="overflow-hidden rounded-2xl border border-line bg-panel"
-                  >
+                  <figure key={p.sceneId}>
                     {p.ok && p.url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={p.url}
                         alt={p.sceneName}
-                        className="aspect-square w-full object-cover"
+                        className="aspect-square w-full rounded-2xl object-cover"
                       />
                     ) : (
-                      <div className="flex aspect-square w-full items-center justify-center bg-raise p-4 text-center text-xs text-red-300">
+                      <div className="flex aspect-square w-full items-center justify-center rounded-2xl bg-raise p-4 text-center text-xs text-red-300">
                         {p.error}
                       </div>
                     )}
-                    <figcaption className="flex items-center justify-between p-3">
-                      <span className="truncate text-xs font-medium">
-                        {p.sceneName}
-                      </span>
+                    <figcaption className="mt-2 flex items-center justify-between gap-2">
+                      <span className="truncate text-xs">{p.sceneName}</span>
                       {p.ok ? (
                         <a
                           href={p.url}
                           download
-                          className="shrink-0 text-xs text-neon"
+                          className="shrink-0 text-xs font-medium text-neon"
                         >
                           Tải
                         </a>
@@ -250,7 +269,7 @@ export default function Workbench({
               {readyPhotos.length > 0 ? (
                 <button
                   onClick={() => setTab("scripts")}
-                  className={`${buttonGhostClass} mt-5`}
+                  className={`${buttonGhostClass} mt-5 w-full py-3.5`}
                 >
                   🎬 Xem kịch bản chạy trên ảnh này →
                 </button>
@@ -272,7 +291,7 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={`${buttonClass} w-full sm:w-auto`}
+            className={`${buttonClass} w-full py-3.5`}
           >
             {busy === "listing"
               ? "Đang viết..."
@@ -316,34 +335,44 @@ export default function Workbench({
               </Card>
 
               <Card>
-                <div className="text-sm font-semibold">Hashtag</div>
-                <p className="mt-2 text-sm">
-                  <span className="text-muted">Shopee: </span>
-                  <span className="text-neon">
-                    {listing.shopeeHashtags.join(" ")}
-                  </span>
-                </p>
-                <p className="mt-1 text-sm">
-                  <span className="text-muted">TikTok: </span>
-                  <span className="text-neon">
-                    {listing.tiktokHashtags.join(" ")}
-                  </span>
-                </p>
+                <Header
+                  label="Hashtags gợi ý"
+                  text={`Shopee: ${listing.shopeeHashtags.join(" ")}\nTikTok Shop: ${listing.tiktokHashtags.join(" ")}`}
+                />
+                <div className="mt-3 space-y-3 text-sm">
+                  <div>
+                    <div className="text-xs text-dim">Shopee:</div>
+                    <p className="mt-1 leading-relaxed text-neon">
+                      {listing.shopeeHashtags.join(" ")}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="text-xs text-dim">TikTok Shop:</div>
+                    <p className="mt-1 leading-relaxed text-neon">
+                      {listing.tiktokHashtags.join(" ")}
+                    </p>
+                  </div>
+                </div>
                 <p className="mt-3 text-xs text-dim">
                   Từ khoá chạy quảng cáo: {listing.keywords.join(", ")}
                 </p>
               </Card>
 
               {listing.issues.claims.length > 0 ? (
-                <Card className="border-amber-500/30 bg-amber-500/10">
-                  <div className="text-sm font-semibold text-amber-200">
+                <Card className="border-brand/40 bg-brand/5">
+                  <div className="text-sm font-bold text-brand">
                     ⚠ Cụm từ có rủi ro bị gỡ listing
                   </div>
-                  <ul className="mt-2 space-y-2 text-sm text-amber-100/90">
+                  <ul className="mt-2 space-y-2.5 text-sm leading-snug">
                     {listing.issues.claims.map((c, i) => (
                       <li key={i}>
-                        <b>&ldquo;{c.matched}&rdquo;</b> — {c.why}
-                        <div className="text-amber-200/70">→ {c.fix}</div>
+                        <span className="text-muted">
+                          Từ <b className="text-ink">&ldquo;{c.matched}&rdquo;</b>{" "}
+                          {c.why}
+                        </span>
+                        <div className="mt-1 font-medium text-brand">
+                          → Đề xuất: {c.fix}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -366,7 +395,7 @@ export default function Workbench({
                 setBalance(res.balance);
               }
             }}
-            className={`${buttonClass} w-full sm:w-auto`}
+            className={`${buttonClass} w-full py-3.5`}
           >
             {busy === "scripts"
               ? "Đang viết kịch bản..."
@@ -394,11 +423,13 @@ export default function Workbench({
 
 function Header({ label, text }: { label: string; text: string }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm font-semibold">{label}</span>
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
+        {label}
+      </span>
       <button
         onClick={() => navigator.clipboard?.writeText(text)}
-        className="rounded-lg border border-line bg-raise px-2.5 py-1 text-xs font-medium transition hover:border-dim"
+        className="shrink-0 text-xs font-medium text-neon transition hover:opacity-80"
       >
         Chép
       </button>
@@ -418,18 +449,12 @@ function TitleCard({
   issues: Issue[];
 }) {
   const over = value.length > limit;
-  const pct = Math.min(100, (value.length / limit) * 100);
   return (
     <Card>
       <Header label={label} text={value} />
-      <p className="mt-2 text-sm text-ink">{value}</p>
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-raise">
-        <div
-          className={`h-full rounded-full ${over ? "bg-red-500" : "bg-neon"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <p className={`mt-1 text-xs ${over ? "text-red-400" : "text-dim"}`}>
+      <p className="mt-2 text-[15px] leading-snug text-ink">{value}</p>
+      <hr className="mt-3 border-line" />
+      <p className={`mt-2 text-xs ${over ? "text-red-400" : "text-dim"}`}>
         {value.length}/{limit} ký tự
       </p>
       {issues.length > 0 ? (

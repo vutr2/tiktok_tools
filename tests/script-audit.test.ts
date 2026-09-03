@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditScript } from "@/lib/ai/claude";
+import { auditScript } from "@/lib/ai/text-core";
 import { getPack } from "@/prompts";
 
 const pack = getPack("GIA_DUNG");

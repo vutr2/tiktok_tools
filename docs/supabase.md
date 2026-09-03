@@ -63,7 +63,11 @@ App này không bao giờ gọi PostgREST, nên cách xử lý gọn nhất là 
 bật RLS trên cả 6 bảng, không viết policy nào. `anon` và `authenticated` mất sạch
 quyền; Prisma kết nối bằng role `postgres` (có `BYPASSRLS`) nên không hề bị ảnh hưởng.
 
-Chạy `prisma/rls.sql` **sau mỗi lần `db:push` tạo bảng mới**.
+Chạy `prisma/rls.sql` **sau mỗi lần `db:push` tạo bảng mới**. Bảng mới luôn sinh
+ra với RLS TẮT — đã dính đúng một lần khi thêm 6 bảng vận hành.
+
+Đừng lấy `[]` từ REST API làm bằng chứng đã đóng: **bảng rỗng cũng trả `[]`**.
+Kiểm bằng truy vấn cuối `rls.sql`, nó liệt kê bảng nào còn hở.
 
 ## `$transaction` qua pooler
 

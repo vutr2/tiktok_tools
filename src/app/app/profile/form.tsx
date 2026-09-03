@@ -57,7 +57,7 @@ export default function ProfileForm({
   return (
     <>
       <form onSubmit={save} className="mt-4 space-y-4">
-        <Field label="Tên" hint="Để xưng hô, không ảnh hưởng tới kết quả sinh.">
+        <Field label="Họ và tên" hint="Để xưng hô, không ảnh hưởng tới kết quả sinh.">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -79,27 +79,28 @@ export default function ProfileForm({
         </Field>
 
         <div>
-          <span className="mb-2 block text-sm font-medium">Ngành hàng</span>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <span className="mb-2 block text-sm font-medium">
+            Ngành hàng kinh doanh chính
+          </span>
+          <div className="flex flex-wrap gap-2">
             {industries.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => setIndustry(opt.value)}
-                className={`rounded-xl border px-2 py-3 text-xs transition ${
+                className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
                   industry === opt.value
-                    ? "border-brand bg-brand-soft font-semibold text-ink"
+                    ? "border-brand bg-brand-soft text-ink"
                     : "border-line bg-raise text-muted hover:border-dim"
                 }`}
               >
-                <span className="block text-xl">{opt.emoji}</span>
-                <span className="mt-1 block leading-tight">{opt.label}</span>
+                {opt.emoji} {opt.label}
               </button>
             ))}
           </div>
-          <p className="mt-2 text-xs text-dim">
-            Đổi ngành chỉ đổi bộ prompt cho những lần sinh sau. Sản phẩm đã tạo
-            giữ nguyên ngành cũ để kết quả cũ không đổi nghĩa.
+          <p className="mt-2.5 text-xs leading-relaxed text-dim">
+            ℹ️ Đổi ngành chỉ đổi bộ prompt cho những lần sinh sau. Sản phẩm đã
+            tạo giữ nguyên ngành cũ.
           </p>
         </div>
 
@@ -111,17 +112,17 @@ export default function ProfileForm({
         <button
           type="submit"
           disabled={busy || !dirty}
-          className={`${buttonClass} w-full sm:w-auto`}
+          className={`${buttonClass} w-full py-3`}
         >
           {busy ? "Đang lưu..." : "Lưu thay đổi"}
         </button>
       </form>
 
-      <div className="mt-6 border-t border-line pt-5">
+      <div className="mt-5">
         <button
           onClick={signOut}
           disabled={leaving}
-          className="w-full rounded-xl border border-brand/40 bg-brand-soft px-4 py-3 text-sm font-semibold text-brand transition active:scale-[0.99] disabled:opacity-50 sm:w-auto sm:px-6"
+          className="w-full rounded-xl border border-brand bg-transparent px-4 py-3.5 text-sm font-semibold text-brand transition hover:bg-brand-soft active:scale-[0.99] disabled:opacity-50"
         >
           {leaving ? "Đang thoát..." : "↪ Đăng xuất"}
         </button>

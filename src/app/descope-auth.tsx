@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthProvider, Descope } from "@descope/nextjs-sdk";
+import { getRefreshToken, getSessionToken } from "@descope/nextjs-sdk/client";
 
 export default function DescopeAuth({
   projectId,
@@ -26,11 +27,46 @@ export default function DescopeAuth({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function exchange() {
+  /**
+   * Token lấy từ payload của chính sự kiện thành công.
+   *
+   * Không dùng cookie và không dùng getSessionToken(): cả hai đều là kho lưu
+   * trữ, tức luôn có khoảng trễ giữa lúc flow xong và lúc token được ghi vào —
+   * `onSuccess` chạy trong khoảng đó thì đọc ra rỗng. Payload thì có sẵn ngay.
+   * Vẫn đọc kho làm phương án dự phòng nếu payload thiếu.
+   */
+  async function exchange(detail?: { sessionJwt?: string; refreshJwt?: string }) {
     setBusy(true);
     setError(null);
-    // Không gửi email lên — server tự đọc từ phiên Descope đã xác minh.
-    const res = await fetch("/api/auth/descope", { method: "POST" });
+
+    const sessionJwt = detail?.sessionJwt || getSessionToken();
+    const refreshJwt = detail?.refreshJwt || getRefreshToken();
+
+    if (!sessionJwt) {
+      setBusy(false);
+      // Chỉ in TÊN khoá, không in giá trị: payload chứa cả sessionJwt và
+      // refreshJwt, đổ nguyên ra console là rải credential vào lịch sử console
+      // và vào bất kỳ công cụ giám sát lỗi nào bắt console về sau.
+      console.error(
+        "[descope] onSuccess không có sessionJwt. Các khoá nhận được:",
+        detail ? Object.keys(detail).join(", ") : "(rỗng)",
+      );
+      return setError(
+        "Xác thực xong nhưng Descope không trả về session token. " +
+          "Kiểm tra trong Descope Console > Flows: flow phải kết thúc bằng bước " +
+          "cấp JWT (Sign In / Sign Up), không phải bước tuỳ chỉnh.",
+      );
+    }
+
+    // Vẫn KHÔNG gửi email — server tự đọc từ session token đã xác minh chữ ký.
+    const res = await fetch("/api/auth/descope", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionJwt}`,
+      },
+      body: JSON.stringify({ refreshJwt }),
+    });
     const body = await res.json().catch(() => null);
     setBusy(false);
 
@@ -47,16 +83,19 @@ export default function DescopeAuth({
     <div className="rounded-3xl border border-line bg-panel p-5 shadow-2xl shadow-black/40 sm:p-6">
       {/* Cả hai token phải nằm ở cookie thì server mới đọc được:
           DS để xác minh phiên, DSR để gọi me() lấy email đã xác minh. */}
+      {/* persistTokens là điều kiện tiên quyết: thiếu nó thì hai cờ cookie bên
+          dưới bị bỏ qua hoàn toàn và token chỉ nằm trong bộ nhớ. */}
       <AuthProvider
         projectId={projectId}
         baseUrl={baseUrl}
+        persistTokens
         sessionTokenViaCookie
         refreshTokenViaCookie
       >
         <Descope
           flowId={flowId}
           theme="dark"
-          onSuccess={exchange}
+          onSuccess={(e) => exchange(e.detail)}
           onError={() =>
             setError("Xác thực không thành công. Thử lại giúp tôi.")
           }

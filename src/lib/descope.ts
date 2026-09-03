@@ -51,13 +51,21 @@ function asString(v: unknown): string | undefined {
  * Bắt buộc `verifiedEmail === true`. Đây là lý do dùng Descope: email chưa xác
  * minh mà vẫn cho vào thì ai cũng đăng ký hộ người khác và ăn credit tặng.
  */
-export async function verifiedIdentityFromDescope(): Promise<VerifiedIdentity> {
+export async function verifiedIdentityFromDescope(
+  /**
+   * Refresh token client gửi kèm. Cookie DSR chỉ tồn tại khi AuthProvider bật
+   * `persistTokens`; nhận thẳng từ client thì không phụ thuộc vào chuyện đó nữa.
+   */
+  refreshJwtFromClient?: string,
+): Promise<VerifiedIdentity> {
   const projectId = descopeProjectId();
   if (!projectId) {
     throw new AppError("DESCOPE_OFF", "Chưa bật Descope trên server", 503);
   }
 
   const baseUrl = descopeBaseUrl();
+  // session() ưu tiên header `Authorization: Bearer` rồi mới tới cookie DS.
+  // Client gửi thẳng token nên không cần cookie hoạt động.
   const info = await session({ projectId, baseUrl });
   if (!info) {
     throw new AppError(
@@ -80,12 +88,15 @@ export async function verifiedIdentityFromDescope(): Promise<VerifiedIdentity> {
 
   // Token không mang email (hoặc chưa rõ đã xác minh) — hỏi thẳng Descope.
   // `me()` nhận REFRESH token (cookie DSR), không phải session JWT.
-  const refreshJwt = (await cookies()).get(descopeSdk.RefreshTokenCookieName)
-    ?.value;
+  //
+  // Ưu tiên cookie hơn body: cookie do trình duyệt gắn, body do client tự đặt.
+  const refreshJwt =
+    (await cookies()).get(descopeSdk.RefreshTokenCookieName)?.value ??
+    refreshJwtFromClient;
   if (!refreshJwt) {
     throw new AppError(
       "DESCOPE_NO_REFRESH",
-      "Thiếu refresh token của Descope. Bật `sessionTokenViaCookie` ở AuthProvider.",
+      "Không có refresh token của Descope (cả từ client lẫn cookie DSR).",
       401,
     );
   }
@@ -99,6 +110,18 @@ export async function verifiedIdentityFromDescope(): Promise<VerifiedIdentity> {
       "DESCOPE_NO_USER",
       "Descope không trả về thông tin người dùng.",
       502,
+    );
+  }
+
+  // CHỐT CHẶN: refresh token đến từ client nên phải chứng minh nó thuộc về đúng
+  // người mà session token đã xác minh. Thiếu bước này, kẻ tấn công đăng nhập
+  // bằng tài khoản của mình rồi đính refresh token của nạn nhân vào body là
+  // chiếm được phiên của nạn nhân — session token hợp lệ trở thành vô nghĩa.
+  if (user.userId !== info.token.sub) {
+    throw new AppError(
+      "IDENTITY_MISMATCH",
+      "Phiên và refresh token không thuộc cùng một tài khoản.",
+      401,
     );
   }
 

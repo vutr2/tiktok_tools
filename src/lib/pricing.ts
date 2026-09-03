@@ -32,6 +32,8 @@ export type CreditPack = {
   /** MIXED = dùng cho cả text lẫn ảnh. IMAGE_ONLY = credit chỉ tiêu được cho ảnh. */
   kind: "MIXED" | "IMAGE_ONLY";
   enabled: boolean;
+  /** Nhãn trên thẻ gói. "Phổ biến" được tô đậm, các nhãn khác viền mờ. */
+  badge?: string;
   note?: string;
 };
 
@@ -47,6 +49,18 @@ export const PACKS: CreditPack[] = [
     credits: 60,
     kind: "MIXED",
     enabled: true,
+    badge: "Phổ biến",
+  },
+  {
+    // 1.320đ/credit. Rẻ hơn gói 99k 20% nhưng biên ảnh vẫn 73% ở 5 credit —
+    // kiểm lại bằng `npm run economics` mỗi lần đổi giá vốn provider.
+    id: "saver_199k",
+    name: "Gói 199k",
+    priceVnd: 199_000,
+    credits: 150,
+    kind: "MIXED",
+    enabled: true,
+    badge: "Tiết kiệm",
   },
   {
     id: "image_99k",
@@ -103,6 +117,39 @@ export function claudeCostVnd(
   const usd =
     (inputTokens / 1_000_000) * price.input +
     (outputTokens / 1_000_000) * price.output;
+  return usdToVnd(usd);
+}
+
+/**
+ * Giá DeepSeek, USD / 1 triệu token. Nguồn: trang giá chính thức của DeepSeek.
+ *
+ * `inputHit` là token trúng cache prefix — DeepSeek tự cache, rẻ hơn ~50 lần, và
+ * prompt hệ thống theo ngành của app là hằng số nên tỷ lệ trúng sẽ cao.
+ *
+ * `null` = CHƯA đối soát được giá niêm yết. Biến thể vision đang ở diện thử
+ * nghiệm và họ không công bố giá rõ ràng, nên để null thay vì đoán — cùng luật
+ * với ảnh: không bịa số cho bảng kinh tế đơn vị trông có vẻ đầy đủ.
+ */
+export const DEEPSEEK_MODELS: Record<
+  string,
+  { inputMiss: number; inputHit: number; output: number } | null
+> = {
+  "deepseek-v4-flash": { inputMiss: 0.14, inputHit: 0.0028, output: 0.28 },
+  "deepseek-v4-pro": { inputMiss: 0.435, inputHit: 0.003625, output: 0.87 },
+  "deepseek-v4-flash-vision-exp": null,
+};
+
+/** VND cho một lần gọi DeepSeek. `null` khi chưa biết giá của model đó. */
+export function deepseekCostVnd(
+  model: string,
+  tokens: { inputMiss: number; inputHit: number; output: number },
+): number | null {
+  const price = DEEPSEEK_MODELS[model];
+  if (!price) return null;
+  const usd =
+    (tokens.inputMiss / 1_000_000) * price.inputMiss +
+    (tokens.inputHit / 1_000_000) * price.inputHit +
+    (tokens.output / 1_000_000) * price.output;
   return usdToVnd(usd);
 }
 

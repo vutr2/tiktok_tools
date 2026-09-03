@@ -24,6 +24,18 @@ export const INDUSTRY_EMOJI: Record<Industry, string> = {
   PHU_KIEN: "⌚",
 };
 
+/**
+ * Một dòng tả bối cảnh ảnh của ngành — hiện trên thẻ chọn ngành.
+ * Người bán chọn ngành trước khi thấy kết quả, nên phải nói trước họ sẽ nhận gì.
+ */
+export const INDUSTRY_BLURB: Record<Industry, string> = {
+  MY_PHAM: "Dựng ảnh mịn màng sáng bóng, bối cảnh sang trọng kiểu spa",
+  THOI_TRANG: "Bối cảnh đường phố hoặc studio phẳng, bóc tách nếp vải tự nhiên",
+  GIA_DUNG: "Nền bàn bếp gỗ tối giản, bối cảnh phòng khách ấm cúng",
+  ME_VA_BE: "Ánh sáng dịu nhẹ pastel, bối cảnh nôi gỗ hoặc thảm bông mềm",
+  PHU_KIEN: "Bối cảnh nền gương đen, đá thô, đổ bóng sắc nét cao cấp",
+};
+
 export function isIndustry(v: unknown): v is Industry {
   return typeof v === "string" && (INDUSTRIES as readonly string[]).includes(v);
 }

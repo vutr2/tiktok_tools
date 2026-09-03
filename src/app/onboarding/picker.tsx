@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { buttonClass } from "@/components/ui";
 
-type Option = { value: string; label: string; emoji: string };
+type Option = { value: string; label: string; emoji: string; blurb: string };
 
 export default function IndustryPicker({
   industries,
@@ -35,23 +35,33 @@ export default function IndustryPicker({
   }
 
   return (
-    <div className="rounded-3xl border border-line bg-panel p-5">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {industries.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => setIndustry(opt.value)}
-            className={`rounded-xl border px-2 py-4 text-xs transition ${
-              industry === opt.value
-                ? "border-brand bg-brand-soft font-semibold text-ink"
-                : "border-line bg-raise text-muted hover:border-dim"
-            }`}
-          >
-            <span className="block text-2xl">{opt.emoji}</span>
-            <span className="mt-1.5 block leading-tight">{opt.label}</span>
-          </button>
-        ))}
+    <div className="mt-6">
+      <div className="grid gap-3">
+        {industries.map((opt) => {
+          const on = industry === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setIndustry(opt.value)}
+              className={`flex items-center gap-3.5 rounded-2xl border p-3.5 text-left transition ${
+                on
+                  ? "border-brand bg-brand-soft"
+                  : "border-line bg-panel hover:border-dim"
+              }`}
+            >
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-raise text-2xl">
+                {opt.emoji}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[15px] font-bold">{opt.label}</span>
+                <span className="mt-0.5 block text-xs leading-snug text-dim">
+                  {opt.blurb}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
@@ -59,7 +69,7 @@ export default function IndustryPicker({
       <button
         onClick={save}
         disabled={busy || !industry}
-        className={`${buttonClass} mt-5 w-full py-3`}
+        className={`${buttonClass} mt-6 w-full py-3.5 text-[15px]`}
       >
         {busy ? "Đang lưu..." : "Vào studio →"}
       </button>

@@ -75,6 +75,7 @@ export const ME_VA_BE: PromptPack = {
   scenes: [
     {
       id: "nursery_pastel",
+      emoji: "🧸",
       name: "Phòng bé tông pastel",
       useCase: "Ảnh chính — tạo cảm giác an toàn, sạch sẽ ngay từ thumbnail.",
       prompt:
@@ -85,6 +86,7 @@ export const ME_VA_BE: PromptPack = {
     },
     {
       id: "cotton_flatlay",
+      emoji: "🧺",
       name: "Flatlay khăn cotton",
       useCase: "Đồ vải, quần áo sơ sinh — khoe chất liệu mềm.",
       prompt:
@@ -95,6 +97,7 @@ export const ME_VA_BE: PromptPack = {
     },
     {
       id: "playmat_wood",
+      emoji: "🪵",
       name: "Thảm chơi & sàn gỗ sáng",
       useCase: "Đồ chơi, đồ tập đi — cho thấy môi trường dùng thật.",
       prompt:
@@ -105,6 +108,7 @@ export const ME_VA_BE: PromptPack = {
     },
     {
       id: "pastel_gradient",
+      emoji: "🌸",
       name: "Phông gradient pastel",
       useCase: "Ảnh bìa gọn, nổi bật trên feed và trong kết quả tìm kiếm.",
       prompt:

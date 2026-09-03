@@ -68,6 +68,7 @@ export const MY_PHAM: PromptPack = {
   scenes: [
     {
       id: "marble_podium",
+      emoji: "🪨",
       name: "Bục đá cẩm thạch",
       useCase: "Ảnh bìa listing — sạch, sang, dễ nhìn trên thumbnail nhỏ.",
       prompt:
@@ -78,6 +79,7 @@ export const MY_PHAM: PromptPack = {
     },
     {
       id: "wet_stone",
+      emoji: "💧",
       name: "Đá ướt & giọt nước",
       useCase: "Nhấn cảm giác cấp ẩm, mát da — hợp serum, toner, gel.",
       prompt:
@@ -88,6 +90,7 @@ export const MY_PHAM: PromptPack = {
     },
     {
       id: "silk_drape",
+      emoji: "🎀",
       name: "Lụa pastel",
       useCase: "Ảnh cảm xúc cho quảng cáo và ảnh phụ, hợp dòng dịu nhẹ.",
       prompt:
@@ -98,6 +101,7 @@ export const MY_PHAM: PromptPack = {
     },
     {
       id: "vanity_flatlay",
+      emoji: "💄",
       name: "Flatlay bàn trang điểm",
       useCase: "Ảnh ngữ cảnh — cho người mua thấy sản phẩm nằm trong routine.",
       prompt:

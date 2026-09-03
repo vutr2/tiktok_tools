@@ -69,6 +69,7 @@ export const PHU_KIEN: PromptPack = {
   scenes: [
     {
       id: "dark_acrylic",
+      emoji: "🖤",
       name: "Acrylic đen phản chiếu",
       useCase: "Ảnh chính cho đồ công nghệ — nhìn cao cấp, hợp thumbnail tối.",
       prompt:
@@ -79,6 +80,7 @@ export const PHU_KIEN: PromptPack = {
     },
     {
       id: "leather_desk",
+      emoji: "🗂️",
       name: "Bàn làm việc da",
       useCase: "Ảnh ngữ cảnh — bán cho dân văn phòng, cảm giác dùng hằng ngày.",
       prompt:
@@ -89,6 +91,7 @@ export const PHU_KIEN: PromptPack = {
     },
     {
       id: "neon_gradient",
+      emoji: "🌈",
       name: "Gradient neon gaming",
       useCase: "Đồ gaming / phụ kiện giới trẻ — nổi bật trên feed TikTok.",
       prompt:
@@ -99,6 +102,7 @@ export const PHU_KIEN: PromptPack = {
     },
     {
       id: "geometric_blocks",
+      emoji: "🔷",
       name: "Khối hình học tối giản",
       useCase: "Ảnh phụ khoe kích thước và độ mỏng, nhìn rất gọn.",
       prompt:

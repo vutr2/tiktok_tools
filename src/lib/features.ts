@@ -20,7 +20,7 @@ import {
   type ImageInput,
   type ListingCopy,
   type VideoScript,
-} from "./ai/claude";
+} from "./ai/text";
 import { allScenes, buildPhotoPrompt, getScene } from "@/prompts";
 import type { Industry } from "./industries";
 
