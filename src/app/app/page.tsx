@@ -31,18 +31,23 @@ export default async function Dashboard() {
       <PageHeader title="Sản phẩm" balance={user.wallet?.balance ?? 0} />
 
       {products.length === 0 ? (
-        <div className="mx-auto max-w-md rounded-3xl border border-dashed border-line p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-raise text-2xl">
-            📸
+        // Trên desktop khối rỗng dồn lên đỉnh, để lại một mảng đen rất lớn bên
+        // dưới. Căn giữa theo chiều dọc phần còn lại thì khoảng trống chia đều
+        // hai phía — nhìn có chủ đích thay vì như trang bị cụt.
+        <div className="flex min-h-[58vh] items-center justify-center sm:min-h-[62vh]">
+          <div className="w-full max-w-md rounded-3xl border border-dashed border-line p-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-raise text-2xl">
+              📸
+            </div>
+            <p className="mt-4 font-semibold">Chưa có sản phẩm nào</p>
+            <p className="mx-auto mt-1.5 max-w-[17rem] text-sm text-muted">
+              Chụp một tấm bằng điện thoại, đặt trên nền trơn. Phần studio để
+              máy lo.
+            </p>
+            <Link href="/app/new" className={`${buttonClass} mt-6 w-full py-3`}>
+              ✨ Bắt đầu
+            </Link>
           </div>
-          <p className="mt-4 font-semibold">Chưa có sản phẩm nào</p>
-          <p className="mx-auto mt-1.5 max-w-[17rem] text-sm text-muted">
-            Chụp một tấm bằng điện thoại, đặt trên nền trơn. Phần studio để máy
-            lo.
-          </p>
-          <Link href="/app/new" className={`${buttonClass} mt-6 w-full py-3`}>
-            ✨ Bắt đầu
-          </Link>
         </div>
       ) : (
         <>
