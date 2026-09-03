@@ -18,8 +18,14 @@ export function checkDatabaseUrl(
       opts.envFileExists
         ? "Thiếu DATABASE_URL trong .env. Lấy chuỗi kết nối ở Supabase Dashboard > " +
           "Connect > ORMs > Prisma (cần cả DIRECT_URL). Xem docs/supabase.md."
-        : "Chưa có file .env. Chạy `cp .env.example .env`, rồi dán 2 chuỗi kết nối " +
-          "Supabase (DATABASE_URL + DIRECT_URL) và đặt AUTH_SECRET. Xem docs/supabase.md.",
+        : // Không có .env: có thể là máy chưa cấu hình, cũng có thể là môi trường
+          // deploy nơi biến đến từ bảng Environment Variables. Nói cả hai đường.
+          "Thiếu DATABASE_URL và không thấy file .env.\n" +
+          "  • Máy cá nhân: chạy `cp .env.example .env` rồi điền DATABASE_URL, " +
+          "DIRECT_URL, AUTH_SECRET.\n" +
+          "  • Vercel/hosting: đặt các biến đó trong Environment Variables của " +
+          "project, nhớ tick cả môi trường Production lẫn Preview.\n" +
+          "  Xem docs/supabase.md.",
     );
   }
 

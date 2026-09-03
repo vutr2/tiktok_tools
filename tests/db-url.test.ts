@@ -27,10 +27,12 @@ describe("chuỗi hợp lệ thì không chặn", () => {
 });
 
 describe("chưa cấu hình", () => {
-  it("không có .env thì bảo tạo .env", () => {
-    expect(() =>
-      checkDatabaseUrl(undefined, { envFileExists: false }),
-    ).toThrow(/Chưa có file .env/);
+  it("không có .env thì chỉ cả đường máy cá nhân LẪN đường hosting", () => {
+    // Lỗi này nổ trên Vercel lúc build, nơi câu "chạy cp .env.example" là vô
+    // nghĩa — thông báo phải nói cả hai chỗ.
+    const run = () => checkDatabaseUrl(undefined, { envFileExists: false });
+    expect(run).toThrow(/cp .env.example/);
+    expect(run).toThrow(/Environment Variables/);
   });
 
   it("có .env nhưng thiếu biến thì chỉ vào Dashboard", () => {
