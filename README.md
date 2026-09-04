@@ -37,18 +37,23 @@ chỉ có ảnh trả về là ảnh gốc. Sinh ảnh thật cần `GEMINI_API_
 `IMAGE_PROVIDER=gemini`; sinh text cần `ANTHROPIC_API_KEY`.
 
 ```bash
-npm test          # 81 test, không cần DB
+npm test          # 90 test, không cần DB
 npm run typecheck
 npm run economics # in bảng kinh tế đơn vị, exit 1 nếu chưa đo giá ảnh
 ```
 
 ## Kinh tế đơn vị
 
-| | credit |
+**Gói trọn đời $200** — trả một lần, dùng không giới hạn. Gói credit đã ngừng bán.
+
+| | credit (chỉ áp dụng cho tài khoản FREE cũ) |
 |---|---|
 | 1 lần sinh text | 1 |
 | 1 ảnh (1 bối cảnh) | 5 |
-| Gói 99k | 60 credit |
+
+Giá vốn thật mỗi lần sinh vẫn không đổi khi bán trọn đời — nó chuyển sang mình
+chịu. Hoà vốn ở **~592 sản phẩm trọn bộ** mỗi người dùng; theo dõi bằng
+`generations.providerCostVnd`, xem `lifetimeBreakEven()` trong `src/lib/pricing.ts`.
 
 Ảnh sinh bằng Gemini image ("nano banana") — biên **79%** ở 5 credit. Chỗ lỗ là
 kịch bản video, không phải ảnh. Bảng so provider, cách đối soát giá thật và **hai

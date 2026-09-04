@@ -104,8 +104,15 @@ export async function generateProductPhotos(args: {
   // Kiểm đủ credit cho TOÀN BỘ số bối cảnh trước khi chạy cái nào. Chạy được 2/4
   // rồi hết credit là trải nghiệm tệ nhất có thể.
   const total = sceneIds.length * CREDIT_COST.PRODUCT_PHOTO_PER_SCENE;
+  // Người trọn đời không bị chặn bởi số dư.
+  const { plan } = await prisma.user.findUniqueOrThrow({
+    where: { id: args.userId },
+    select: { plan: true },
+  });
   const balance = await getBalance(args.userId);
-  if (balance < total) throw new InsufficientCreditsError(total, balance);
+  if (plan !== "LIFETIME" && balance < total) {
+    throw new InsufficientCreditsError(total, balance);
+  }
 
   product = await ensureCutout(product);
   const cutout = await getImage(product.cutoutImageKey!);

@@ -43,7 +43,7 @@ export default async function ProductPage({
             {INDUSTRY_EMOJI[industry]} {INDUSTRY_LABEL[industry]}
           </p>
         </div>
-        <CreditPill balance={balance} />
+        <CreditPill balance={balance} plan={user.plan} />
       </div>
 
       <Workbench
@@ -58,6 +58,7 @@ export default async function ProductPage({
         }))}
         cost={CREDIT_COST}
         balance={balance}
+        lifetime={user.plan === "LIFETIME"}
       />
     </div>
   );

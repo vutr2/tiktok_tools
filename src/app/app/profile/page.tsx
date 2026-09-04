@@ -30,7 +30,11 @@ export default async function ProfilePage() {
 
   return (
     <div className="max-w-2xl">
-      <PageHeader title="Tôi" balance={user.wallet?.balance ?? 0} />
+      <PageHeader
+        title="Tôi"
+        balance={user.wallet?.balance ?? 0}
+        plan={user.plan}
+      />
 
       <div className="flex items-center gap-4">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-neon text-2xl font-bold uppercase text-white">

@@ -61,6 +61,11 @@ enum CreditTxnType {
   ADJUSTMENT // CSKH chỉnh tay
 }
 
+enum Plan {
+  FREE // trả theo credit
+  LIFETIME // mua một lần, dùng không giới hạn
+}
+
 enum PaymentStatus {
   PENDING
   PAID
@@ -69,14 +74,23 @@ enum PaymentStatus {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  name      String?
-  phone     String?
+  id       String    @id @default(cuid())
+  email    String    @unique
+  name     String?
+  phone    String?
   // Ngành hàng mặc định — bắt chọn ngay bước đầu, quyết định bộ prompt.
-  industry  Industry?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  industry Industry?
+
+  /**
+   * Gói đang dùng.
+   * LIFETIME = trả một lần, sinh không giới hạn. Sổ credit VẪN ghi đầy đủ
+   * (delta 0) để `generations.providerCostVnd` còn dựng lại được một người dùng
+   * đã tốn bao nhiêu — không có số đó thì không biết ai đang lỗ.
+   */
+  plan            Plan      @default(FREE)
+  planActivatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   wallet       CreditWallet?
   transactions CreditTransaction[]

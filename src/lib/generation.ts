@@ -12,7 +12,7 @@
 
 import type { GenerationType, Industry, Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { debit, refundGeneration } from "./credits";
+import { debit, getBalance, refundGeneration } from "./credits";
 import { AppError } from "./errors";
 
 export type RunResult<T> = {
@@ -54,8 +54,24 @@ export async function runGeneration<T>(args: {
     },
   });
 
+  /**
+   * Gói trọn đời: không trừ credit.
+   *
+   * Nhưng generation VẪN được ghi và `providerCostVnd` vẫn được lưu — đó là
+   * cách duy nhất biết một người dùng trọn đời đã tốn của mình bao nhiêu. Bán
+   * không giới hạn mà không đo thì không bao giờ biết mình đang lỗ ở đâu.
+   */
+  const { plan } = await prisma.user.findUniqueOrThrow({
+    where: { id: args.userId },
+    select: { plan: true },
+  });
+  const unlimited = plan === "LIFETIME";
+
   // 1. Trừ trước. Ném InsufficientCreditsError nếu không đủ — chưa gọi API.
   let balanceAfter: number;
+  if (unlimited) {
+    balanceAfter = await getBalance(args.userId);
+  } else {
   try {
     const res = await debit({
       userId: args.userId,
@@ -77,10 +93,14 @@ export async function runGeneration<T>(args: {
     });
     throw err;
   }
+  }
 
   await prisma.generation.update({
     where: { id: generation.id },
-    data: { status: "RUNNING", creditsCharged: args.credits },
+    data: {
+      status: "RUNNING",
+      creditsCharged: unlimited ? 0 : args.credits,
+    },
   });
 
   // 2. Gọi provider.
@@ -108,12 +128,15 @@ export async function runGeneration<T>(args: {
     };
   } catch (err) {
     // 3. Lỗi provider = lỗi của mình, không phải của người dùng. Hoàn đủ.
-    await refundGeneration({
-      userId: args.userId,
-      generationId: generation.id,
-      amount: args.credits,
-      reason: err instanceof Error ? err.message : String(err),
-    });
+    //    Người trọn đời không bị trừ nên cũng không có gì để hoàn.
+    if (!unlimited) {
+      await refundGeneration({
+        userId: args.userId,
+        generationId: generation.id,
+        amount: args.credits,
+        reason: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     await prisma.generation.update({
       where: { id: generation.id },

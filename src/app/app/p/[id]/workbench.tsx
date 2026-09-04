@@ -47,11 +47,14 @@ export default function Workbench({
   scenes,
   cost,
   balance: initialBalance,
+  lifetime,
 }: {
   productId: string;
   productName: string;
   originalUrl: string;
   scenes: Scene[];
+  /** Gói trọn đời: không hiện giá credit, vì không tính tiền theo lần dùng. */
+  lifetime: boolean;
   cost: {
     PRODUCT_PHOTO_PER_SCENE: number;
     LISTING_COPY: number;
@@ -130,7 +133,9 @@ export default function Workbench({
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h2 className="text-base font-bold">Chọn bối cảnh</h2>
             <span className="text-xs text-muted">
-              {cost.PRODUCT_PHOTO_PER_SCENE} credit / ảnh · còn {balance}
+              {lifetime
+                ? "Không giới hạn"
+                : `${cost.PRODUCT_PHOTO_PER_SCENE} credit / ảnh · còn ${balance}`}
             </span>
           </div>
 
@@ -296,7 +301,9 @@ export default function Workbench({
           >
             {busy === "listing"
               ? "Đang viết..."
-              : `📝 Viết mô tả · ${cost.LISTING_COPY} credit`}
+              : lifetime
+                ? "📝 Viết mô tả"
+                : `📝 Viết mô tả · ${cost.LISTING_COPY} credit`}
           </button>
 
           {busy === "listing" ? (
@@ -400,7 +407,9 @@ export default function Workbench({
           >
             {busy === "scripts"
               ? "Đang viết kịch bản..."
-              : `🎬 Viết 5 kịch bản · ${cost.VIDEO_SCRIPT} credit`}
+              : lifetime
+                ? "🎬 Viết 5 kịch bản"
+                : `🎬 Viết 5 kịch bản · ${cost.VIDEO_SCRIPT} credit`}
           </button>
 
           {busy === "scripts" ? (

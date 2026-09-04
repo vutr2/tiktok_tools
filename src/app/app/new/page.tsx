@@ -6,6 +6,7 @@ import {
   INDUSTRY_LABEL,
   type Industry,
 } from "@/lib/industries";
+import PageHeader from "@/components/page-header";
 import NewProductForm from "./form";
 
 export default async function NewProduct() {
@@ -14,11 +15,11 @@ export default async function NewProduct() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-bold">Thêm sản phẩm</h1>
-      <p className="mt-1 text-sm text-muted">
-        Ảnh chụp bằng điện thoại là được. Càng điền đủ thông tin, mô tả và kịch
-        bản càng bớt chung chung.
-      </p>
+      <PageHeader
+        title="Thêm mới"
+        balance={user.wallet?.balance ?? 0}
+        plan={user.plan}
+      />
 
       <NewProductForm
         defaultIndustry={industry}

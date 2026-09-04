@@ -48,7 +48,8 @@ export const PACKS: CreditPack[] = [
     priceVnd: 99_000,
     credits: 60,
     kind: "MIXED",
-    enabled: true,
+    // Ngừng bán từ khi chuyển sang gói trọn đời. Credit đã nạp vẫn tiêu được.
+    enabled: false,
     badge: "Phổ biến",
   },
   {
@@ -59,7 +60,7 @@ export const PACKS: CreditPack[] = [
     priceVnd: 199_000,
     credits: 150,
     kind: "MIXED",
-    enabled: true,
+    enabled: false,
     badge: "Tiết kiệm",
   },
   {
@@ -74,6 +75,42 @@ export const PACKS: CreditPack[] = [
 ];
 
 export const DEFAULT_PACK_ID = "starter_99k";
+
+// ---------------------------------------------------------------------------
+// Gói trọn đời
+// ---------------------------------------------------------------------------
+
+/**
+ * Mua một lần, dùng không giới hạn.
+ *
+ * CẢNH BÁO KINH TẾ — đọc trước khi đổi giá:
+ * Giá vốn không biến mất khi bán trọn đời, chỉ chuyển sang mình chịu. Mỗi ảnh
+ * vẫn tốn tiền provider thật. Điểm hoà vốn ở mức giá hiện tại nằm trong
+ * `lifetimeBreakEven()` — vượt mốc đó là bù lỗ cho người dùng đó vĩnh viễn.
+ *
+ * Vì vậy `generations.providerCostVnd` càng quan trọng: đó là cách duy nhất
+ * biết ai đang vượt mốc.
+ */
+export const LIFETIME_PLAN = {
+  id: "lifetime",
+  name: "Gói trọn đời",
+  priceUsd: 200,
+  blurb: "Trả một lần, dùng không giới hạn — ảnh, mô tả, kịch bản.",
+} as const;
+
+export function lifetimePriceVnd(): number {
+  return Math.round(usdToVnd(LIFETIME_PLAN.priceUsd));
+}
+
+/**
+ * Bao nhiêu lần dùng thì hết tiền đã thu.
+ *
+ * Không phải con số để khoe với người dùng — là con số để theo dõi vận hành.
+ */
+export function lifetimeBreakEven(costPerProductVnd: number): number {
+  if (costPerProductVnd <= 0) return Infinity;
+  return Math.floor(lifetimePriceVnd() / costPerProductVnd);
+}
 
 export function getPack(id: string): CreditPack | undefined {
   return PACKS.find((p) => p.id === id);
