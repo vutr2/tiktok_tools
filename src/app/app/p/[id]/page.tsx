@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/supabase";
 import { publicUrl } from "@/lib/storage";
 import { allScenes } from "@/prompts";
 import { CREDIT_COST } from "@/lib/pricing";
 import { INDUSTRY_EMOJI, INDUSTRY_LABEL, type Industry } from "@/lib/industries";
-import PageHeader, { CreditPill } from "@/components/page-header";
+import { getEntitlement } from "@/lib/entitlement";
+import PageHeader, { PlanPill } from "@/components/page-header";
 import Workbench from "./workbench";
 
 export default async function ProductPage({
@@ -16,17 +17,20 @@ export default async function ProductPage({
   const user = await requireUser();
   const { id } = await params;
 
-  const product = await prisma.product.findFirst({
-    where: { id, userId: user.id },
-  });
+  const { data: product } = await db
+    .from("products")
+    .select("*")
+    .eq("id", id)
+    .eq("userId", user.id)
+    .maybeSingle();
   if (!product) notFound();
 
   const industry = product.industry as Industry;
-  const balance = user.wallet?.balance ?? 0;
+  const ent = await getEntitlement(user.id);
 
   return (
     <div>
-      <PageHeader balance={balance} back={{ href: "/app", label: "Sản phẩm" }} />
+      <PageHeader back={{ href: "/app", label: "Sản phẩm" }} />
 
       <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -43,7 +47,7 @@ export default async function ProductPage({
             {INDUSTRY_EMOJI[industry]} {INDUSTRY_LABEL[industry]}
           </p>
         </div>
-        <CreditPill balance={balance} plan={user.plan} />
+        <PlanPill plan={user.plan} remaining={ent.remaining} />
       </div>
 
       <Workbench
@@ -57,7 +61,7 @@ export default async function ProductPage({
           useCase: s.useCase,
         }))}
         cost={CREDIT_COST}
-        balance={balance}
+        remaining={ent.remaining}
         lifetime={user.plan === "LIFETIME"}
       />
     </div>

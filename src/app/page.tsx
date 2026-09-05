@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentUserId } from "@/lib/auth";
 import { INDUSTRIES, INDUSTRY_EMOJI, INDUSTRY_LABEL } from "@/lib/industries";
-import { CREDIT_COST, PACKS, formatVnd } from "@/lib/pricing";
+import { FREE_TRIAL_GENERATIONS, LIFETIME_PLAN } from "@/lib/pricing";
 import {
   descopeBaseUrl,
   descopeEnabled,
@@ -32,8 +32,7 @@ const STEPS: [string, string, string][] = [
 export default async function Home() {
   if (await currentUserId()) redirect("/app");
 
-  const pack = PACKS[0];
-  const bonus = Number(process.env.SIGNUP_BONUS_CREDITS ?? 10);
+  const bonus = FREE_TRIAL_GENERATIONS;
 
   return (
     <main>
@@ -117,28 +116,19 @@ export default async function Home() {
           ))}
         </div>
 
-        <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
+  <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
           <div className="font-semibold">Tính tiền thế nào</div>
           <ul className="mt-3 space-y-1.5 text-sm text-muted">
             <li>
-              <span className="text-ink">
-                {CREDIT_COST.LISTING_COPY} credit
-              </span>{" "}
-              — một lần sinh mô tả hoặc kịch bản
+              <span className="text-ink">{bonus} lượt miễn phí</span> — đủ dựng
+              trọn vẹn một sản phẩm để xem thử kết quả.
             </li>
             <li>
-              <span className="text-ink">
-                {CREDIT_COST.PRODUCT_PHOTO_PER_SCENE} credit
-              </span>{" "}
-              — một ảnh (đủ 4 bối cảnh là{" "}
-              {CREDIT_COST.PRODUCT_PHOTO_PER_SCENE * 4})
-            </li>
-            <li>
-              <span className="text-ink">{pack.name}</span> —{" "}
-              {formatVnd(pack.priceVnd)} được {pack.credits} credit
+              <span className="text-ink">${LIFETIME_PLAN.priceUsd} trả một lần</span>{" "}
+              — sau đó dùng không giới hạn, không hết hạn.
             </li>
             <li className="text-neon">
-              Sinh lỗi thì credit tự động hoàn lại ví.
+              Không có gói tháng, không tính credit từng lần.
             </li>
           </ul>
         </div>

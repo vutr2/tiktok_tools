@@ -6,11 +6,14 @@
  * 3. generateScripts       — 5 kịch bản video 30s
  */
 
-import type { Product } from "@prisma/client";
-import { prisma } from "./db";
-import { getBalance } from "./credits";
+import type { Database } from "./database.types";
+
+/** Dòng products từ supabase — ngày là chuỗi ISO. */
+type Product = Database["public"]["Tables"]["products"]["Row"];
+import { db, unwrapOne } from "./supabase";
+import { getEntitlement, requireEntitlement } from "./entitlement";
 import { runGeneration } from "./generation";
-import { AppError, InsufficientCreditsError } from "./errors";
+import { AppError } from "./errors";
 import { CREDIT_COST } from "./pricing";
 import { getImage, putImage, publicUrl, isAllowedMime } from "./storage";
 import { imageProvider } from "./ai/image";
@@ -25,9 +28,12 @@ import { allScenes, buildPhotoPrompt, getScene } from "@/prompts";
 import type { Industry } from "./industries";
 
 async function loadProduct(userId: string, productId: string): Promise<Product> {
-  const product = await prisma.product.findFirst({
-    where: { id: productId, userId },
-  });
+  const { data: product } = await db
+    .from("products")
+    .select("*")
+    .eq("id", productId)
+    .eq("userId", userId)
+    .maybeSingle();
   if (!product) throw new AppError("NOT_FOUND", "Không tìm thấy sản phẩm", 404);
   return product;
 }
@@ -82,10 +88,15 @@ export async function ensureCutout(product: Product): Promise<Product> {
     prefix: "cutout",
   });
 
-  return prisma.product.update({
-    where: { id: product.id },
-    data: { cutoutImageKey: key },
-  });
+  return unwrapOne(
+    await db
+      .from("products")
+      .update({ cutoutImageKey: key, updatedAt: new Date().toISOString() })
+      .eq("id", product.id)
+      .select("*")
+      .single(),
+    "lưu ảnh tách nền",
+  );
 }
 
 export async function generateProductPhotos(args: {
@@ -101,18 +112,9 @@ export async function generateProductPhotos(args: {
       ? args.sceneIds
       : allScenes(industry).map((s) => s.id);
 
-  // Kiểm đủ credit cho TOÀN BỘ số bối cảnh trước khi chạy cái nào. Chạy được 2/4
-  // rồi hết credit là trải nghiệm tệ nhất có thể.
-  const total = sceneIds.length * CREDIT_COST.PRODUCT_PHOTO_PER_SCENE;
-  // Người trọn đời không bị chặn bởi số dư.
-  const { plan } = await prisma.user.findUniqueOrThrow({
-    where: { id: args.userId },
-    select: { plan: true },
-  });
-  const balance = await getBalance(args.userId);
-  if (plan !== "LIFETIME" && balance < total) {
-    throw new InsufficientCreditsError(total, balance);
-  }
+  // Chặn sớm: phải đủ lượt cho TẤT CẢ bối cảnh đã chọn. Chạy được 2/4 rồi
+  // hết lượt là trải nghiệm tệ nhất có thể.
+  await requireEntitlement(args.userId, sceneIds.length);
 
   product = await ensureCutout(product);
   const cutout = await getImage(product.cutoutImageKey!);
@@ -182,7 +184,7 @@ export async function generateProductPhotos(args: {
   return {
     results,
     creditsCharged,
-    balance: await getBalance(args.userId),
+    balance: (await getEntitlement(args.userId)).remaining,
   };
 }
 

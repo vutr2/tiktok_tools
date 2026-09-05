@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db, unwrapOne } from "@/lib/supabase";
+import { newId } from "@/lib/ids";
 import { fail, ok } from "@/lib/http";
 import { AppError } from "@/lib/errors";
 import { isIndustry } from "@/lib/industries";
@@ -8,11 +9,15 @@ import { MAX_UPLOAD_BYTES, isAllowedMime, putImage, publicUrl } from "@/lib/stor
 export async function GET() {
   try {
     const user = await requireUser();
-    const products = await prisma.product.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const products =
+      (
+        await db
+          .from("products")
+          .select("*")
+          .eq("userId", user.id)
+          .order("createdAt", { ascending: false })
+          .limit(50)
+      ).data ?? [];
     return ok(
       products.map((p) => ({
         id: p.id,
@@ -66,15 +71,22 @@ export async function POST(req: Request) {
       prefix: "raw",
     });
 
-    const product = await prisma.product.create({
-      data: {
-        userId: user.id,
-        industry,
-        name,
-        originalImageKey: key,
-        info: info as never,
-      },
-    });
+    const product: { id: string } = unwrapOne(
+      await db
+        .from("products")
+        .insert({
+          id: newId(),
+          userId: user.id,
+          industry,
+          name,
+          originalImageKey: key,
+          info: info as never,
+          updatedAt: new Date().toISOString(),
+        })
+        .select("id")
+        .single(),
+      "tạo sản phẩm",
+    );
 
     return ok({ id: product.id, imageUrl: publicUrl(key) }, 201);
   } catch (err) {

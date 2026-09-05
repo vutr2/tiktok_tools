@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { buttonClass } from "@/components/ui";
 
 type Bank = { name: string; account: string; holder: string };
@@ -16,7 +17,8 @@ export default function BuyPack({
   primary: boolean;
   bank: Bank;
 }) {
-  const [note, setNote] = useState<string | null>(null);
+  const router = useRouter();
+  const [order, setOrder] = useState<{ id: string; note: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -32,7 +34,25 @@ export default function BuyPack({
     setBusy(false);
     const json = await res.json().catch(() => null);
     if (!res.ok) return setError(json?.error?.message ?? "Không tạo được đơn");
-    setNote(json.transferNote);
+    // Sang thẳng trang thanh toán — cổng lo phần QR/thẻ/NAPAS.
+    router.push(`/app/pay/${json.paymentId}`);
+  }
+
+  async function cancel() {
+    if (!order) return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/payments/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentId: order.id }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      const j = await res.json().catch(() => null);
+      return setError(j?.error?.message ?? "Không huỷ được đơn");
+    }
+    setOrder(null);
   }
 
   return (
@@ -51,7 +71,7 @@ export default function BuyPack({
 
       {error ? <p className="mt-2 text-xs text-red-400">{error}</p> : null}
 
-      {note ? (
+      {order ? (
         <div className="mt-3 rounded-xl border border-line bg-canvas p-3">
           <div className="text-sm font-semibold">
             🏦 Chuyển khoản ngân hàng ({packName})
@@ -67,11 +87,11 @@ export default function BuyPack({
               nổi và cho chép một chạm, gõ tay là sai. */}
           <div className="mt-2.5 flex items-center justify-between gap-3 rounded-lg bg-raise px-3 py-2">
             <span className="truncate font-mono text-sm font-semibold text-ink">
-              {note}
+              {order.note}
             </span>
             <button
               onClick={() => {
-                navigator.clipboard?.writeText(note);
+                navigator.clipboard?.writeText(order.note);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 1800);
               }}
@@ -82,8 +102,18 @@ export default function BuyPack({
           </div>
 
           <p className="mt-2 text-xs text-dim">
-            Credit vào ví ngay sau khi hệ thống nhận được báo có.
+            Gói mở khoá ngay sau khi hệ thống nhận được báo có.
           </p>
+
+          {/* Đổi ý thì phải huỷ được. Đơn treo mãi làm đối soát rối, và lần sau
+              tạo đơn mới lại sinh mã chuyển khoản khác. */}
+          <button
+            onClick={cancel}
+            disabled={busy}
+            className="mt-3 text-xs font-medium text-muted underline underline-offset-2 transition hover:text-ink disabled:opacity-50"
+          >
+            {busy ? "Đang huỷ..." : "Huỷ đơn này"}
+          </button>
         </div>
       ) : null}
     </>

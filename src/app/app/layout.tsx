@@ -36,7 +36,7 @@ export default async function AppLayout({
             <AccountMenu
               email={user.email}
               industryLabel={industryLabel}
-              balance={user.wallet?.balance ?? 0}
+              status={user.plan === "LIFETIME" ? "Gói trọn đời" : "Đang dùng thử"}
             />
           </div>
         </div>

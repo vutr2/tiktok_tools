@@ -9,20 +9,22 @@ export class AppError extends Error {
   }
 }
 
-export class InsufficientCreditsError extends AppError {
+
+/** Hết lượt dùng thử. Không phải lỗi — là lúc mời mua gói. */
+export class TrialExhaustedError extends AppError {
   constructor(
-    public required: number,
-    public available: number,
+    public used: number,
+    public limit: number,
   ) {
     super(
-      "INSUFFICIENT_CREDITS",
-      `Cần ${required} credit nhưng ví chỉ còn ${available}.`,
+      "TRIAL_EXHAUSTED",
+      `Bạn đã dùng hết ${limit} lượt miễn phí. Mua gói trọn đời để dùng không giới hạn.`,
       402,
     );
   }
 }
 
-/** Lỗi từ provider ngoài — đây là loại lỗi PHẢI hoàn credit. */
+/** Lỗi từ provider ngoài. */
 export class ProviderError extends AppError {
   constructor(
     public provider: string,

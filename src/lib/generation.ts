@@ -10,9 +10,13 @@
  * provider trực tiếp.
  */
 
-import type { GenerationType, Industry, Prisma } from "@prisma/client";
-import { prisma } from "./db";
-import { debit, getBalance, refundGeneration } from "./credits";
+import type { Industry } from "./industries";
+import type { Database, Json } from "./database.types";
+
+type GenerationType = Database["public"]["Enums"]["GenerationType"];
+import { db, unwrap } from "./supabase";
+import { newId } from "./ids";
+import { requireEntitlement } from "./entitlement";
 import { AppError } from "./errors";
 
 export type RunResult<T> = {
@@ -28,7 +32,7 @@ export async function runGeneration<T>(args: {
   type: GenerationType;
   industry: Industry;
   credits: number;
-  input: Prisma.InputJsonValue;
+  input: Json;
   provider: string;
   /**
    * Trả về output + chi phí thật (VND) nếu provider báo. Chi phí được ghi vào
@@ -42,66 +46,51 @@ export async function runGeneration<T>(args: {
 }): Promise<RunResult<T>> {
   if (args.credits < 0) throw new Error("credits không được âm");
 
-  const generation = await prisma.generation.create({
-    data: {
-      userId: args.userId,
-      productId: args.productId,
-      type: args.type,
-      industry: args.industry,
-      status: "PENDING",
-      input: args.input,
-      provider: args.provider,
-    },
-  });
+  const generation = unwrap(
+    await db
+      .from("generations")
+      .insert({
+        id: newId(),
+        userId: args.userId,
+        productId: args.productId ?? null,
+        type: args.type,
+        industry: args.industry,
+        status: "PENDING",
+        input: args.input as never,
+        provider: args.provider,
+        updatedAt: new Date().toISOString(),
+      })
+      .select("id")
+      .single(),
+    "tạo generation",
+  );
+  if (!generation) throw new Error("Không tạo được generation");
 
-  /**
-   * Gói trọn đời: không trừ credit.
-   *
-   * Nhưng generation VẪN được ghi và `providerCostVnd` vẫn được lưu — đó là
-   * cách duy nhất biết một người dùng trọn đời đã tốn của mình bao nhiêu. Bán
-   * không giới hạn mà không đo thì không bao giờ biết mình đang lỗ ở đâu.
-   */
-  const { plan } = await prisma.user.findUniqueOrThrow({
-    where: { id: args.userId },
-    select: { plan: true },
-  });
-  const unlimited = plan === "LIFETIME";
-
-  // 1. Trừ trước. Ném InsufficientCreditsError nếu không đủ — chưa gọi API.
-  let balanceAfter: number;
-  if (unlimited) {
-    balanceAfter = await getBalance(args.userId);
-  } else {
+  // Chặn TRƯỚC khi chạm API tốn tiền. Hết lượt dùng thử thì ném ở đây,
+  // generation ghi nhận FAILED và không có lời gọi provider nào xảy ra.
   try {
-    const res = await debit({
-      userId: args.userId,
-      amount: args.credits,
-      idempotencyKey: `debit:${generation.id}`,
-      generationId: generation.id,
-      note: `${args.type}`,
-    });
-    balanceAfter = res.balanceAfter;
+    await requireEntitlement(args.userId);
   } catch (err) {
-    await prisma.generation.update({
-      where: { id: generation.id },
-      data: {
+    await db
+      .from("generations")
+      .update({
         status: "FAILED",
-        errorCode: err instanceof AppError ? err.code : "DEBIT_FAILED",
+        errorCode: err instanceof AppError ? err.code : "NOT_ENTITLED",
         errorMessage: err instanceof Error ? err.message : String(err),
-        completedAt: new Date(),
-      },
-    });
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .eq("id", generation.id);
     throw err;
   }
-  }
 
-  await prisma.generation.update({
-    where: { id: generation.id },
-    data: {
+  await db
+    .from("generations")
+    .update({
       status: "RUNNING",
-      creditsCharged: unlimited ? 0 : args.credits,
-    },
-  });
+      updatedAt: new Date().toISOString(),
+    })
+    .eq("id", generation.id);
 
   // 2. Gọi provider.
   try {
@@ -109,45 +98,39 @@ export async function runGeneration<T>(args: {
       generationId: generation.id,
     });
 
-    await prisma.generation.update({
-      where: { id: generation.id },
-      data: {
+    await db
+      .from("generations")
+      .update({
         status: "SUCCEEDED",
-        output: output as Prisma.InputJsonValue,
+        output: output as never,
         providerCostVnd: providerCostVnd ?? null,
         providerJobId: providerJobId ?? null,
-        completedAt: new Date(),
-      },
-    });
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .eq("id", generation.id);
 
     return {
       generationId: generation.id,
       output,
-      creditsCharged: args.credits,
-      balanceAfter,
+      creditsCharged: 0,
+      balanceAfter: 0,
     };
   } catch (err) {
-    // 3. Lỗi provider = lỗi của mình, không phải của người dùng. Hoàn đủ.
-    //    Người trọn đời không bị trừ nên cũng không có gì để hoàn.
-    if (!unlimited) {
-      await refundGeneration({
-        userId: args.userId,
-        generationId: generation.id,
-        amount: args.credits,
-        reason: err instanceof Error ? err.message : String(err),
-      });
-    }
-
-    await prisma.generation.update({
-      where: { id: generation.id },
-      data: {
+    // 3. Lỗi provider = lỗi của mình, không phải của người dùng.
+    //    Không cần hoàn gì: `getEntitlement` chỉ đếm generation SUCCEEDED,
+    //    nên lần hỏng tự động không tính vào hạn mức dùng thử.
+    await db
+      .from("generations")
+      .update({
         status: "FAILED",
         creditsCharged: 0,
         errorCode: err instanceof AppError ? err.code : "PROVIDER_ERROR",
         errorMessage: err instanceof Error ? err.message : String(err),
-        completedAt: new Date(),
-      },
-    });
+        completedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+      .eq("id", generation.id);
 
     throw err;
   }

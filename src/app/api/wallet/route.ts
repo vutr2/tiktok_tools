@@ -1,33 +1,31 @@
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { getBalance } from "@/lib/credits";
-import { activePacks, CREDIT_COST } from "@/lib/pricing";
+import { getEntitlement } from "@/lib/entitlement";
+import { LIFETIME_PLAN, lifetimePriceVnd } from "@/lib/pricing";
 import { fail, ok } from "@/lib/http";
 
+/**
+ * Trạng thái quyền dùng.
+ *
+ * Không còn credit, không còn sổ cái — chỉ có: đã mua gói chưa, và còn bao
+ * nhiêu lượt dùng thử.
+ */
 export async function GET() {
   try {
     const user = await requireUser();
-    const [balance, transactions] = await Promise.all([
-      getBalance(user.id),
-      prisma.creditTransaction.findMany({
-        where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-        take: 30,
-      }),
-    ]);
+    const e = await getEntitlement(user.id);
 
     return ok({
-      balance,
-      cost: CREDIT_COST,
-      packs: activePacks(),
-      transactions: transactions.map((t) => ({
-        id: t.id,
-        type: t.type,
-        delta: t.delta,
-        balanceAfter: t.balanceAfter,
-        note: t.note,
-        createdAt: t.createdAt,
-      })),
+      plan: user.plan,
+      unlimited: e.unlimited,
+      used: e.used,
+      limit: e.limit,
+      remaining: e.unlimited ? null : e.remaining,
+      lifetime: {
+        id: LIFETIME_PLAN.id,
+        name: LIFETIME_PLAN.name,
+        priceUsd: LIFETIME_PLAN.priceUsd,
+        priceVnd: lifetimePriceVnd(),
+      },
     });
   } catch (err) {
     return fail(err);

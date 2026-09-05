@@ -5,25 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:push": "prisma db push",
-    "db:generate": "prisma generate",
     "economics": "tsx scripts/unit-economics.ts",
-    "probe:image-cost": "tsx scripts/probe-image-cost.ts"
+    "probe:image-cost": "tsx scripts/probe-image-cost.ts",
+    "types:db": "node --env-file=.env scripts/gen-db-types.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
     "@descope/nextjs-sdk": "^0.15.70",
     "@google/genai": "^2.19.0",
-    "@prisma/client": "^6.16.2",
     "@supabase/supabase-js": "^2.115.0",
     "jose": "^6.1.0",
     "next": "^15.5.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "sepay-pg-node": "^1.0.0",
+    "server-only": "^0.0.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {
@@ -31,7 +31,6 @@
     "@types/node": "^22.18.1",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
-    "prisma": "^6.16.2",
     "tailwindcss": "^4.1.13",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",

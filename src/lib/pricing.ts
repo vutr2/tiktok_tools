@@ -98,6 +98,19 @@ export const LIFETIME_PLAN = {
   blurb: "Trả một lần, dùng không giới hạn — ảnh, mô tả, kịch bản.",
 } as const;
 
+/**
+ * Số lần sinh miễn phí trước khi phải mua gói trọn đời.
+ *
+ * 6 = đúng một sản phẩm trọn bộ (4 ảnh + mô tả + kịch bản). Người bán thử được
+ * trọn vẹn một lần rồi mới quyết định — không phải đoán mò.
+ *
+ * Mỗi người dùng thử tốn của mình ~7.118đ (4 ảnh × 1.762đ + 2 lần text × 35đ).
+ * Tăng con số này là tăng thẳng chi phí thu hút người dùng.
+ */
+export const FREE_TRIAL_GENERATIONS = Number(
+  process.env.FREE_TRIAL_GENERATIONS ?? 6,
+);
+
 export function lifetimePriceVnd(): number {
   return Math.round(usdToVnd(LIFETIME_PLAN.priceUsd));
 }

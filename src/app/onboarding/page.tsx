@@ -6,7 +6,8 @@ import {
   INDUSTRY_EMOJI,
   INDUSTRY_LABEL,
 } from "@/lib/industries";
-import { CreditPill } from "@/components/page-header";
+import { FREE_TRIAL_GENERATIONS } from "@/lib/pricing";
+import { PlanPill } from "@/components/page-header";
 import IndustryPicker from "./picker";
 
 /**
@@ -24,7 +25,7 @@ export default async function Onboarding() {
     <main className="mx-auto min-h-svh max-w-md px-5 py-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Bắt đầu</h1>
-        <CreditPill balance={user.wallet?.balance ?? 0} />
+        <PlanPill plan={user.plan} remaining={FREE_TRIAL_GENERATIONS} />
       </div>
 
       <h2 className="mt-6 text-2xl font-bold tracking-tight">

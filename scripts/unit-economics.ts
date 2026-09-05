@@ -32,25 +32,31 @@ import {
 type Measured = { costVnd: number; samples: number; source: string };
 
 async function fromDatabase(): Promise<Record<string, Measured>> {
-  if (!process.env.DATABASE_URL) return {};
+  // Đọc giá vốn ĐO ĐƯỢC từ database qua supabase-js (Prisma đã gỡ hẳn).
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return {};
   try {
-    const { PrismaClient } = await import("@prisma/client");
-    const prisma = new PrismaClient();
-    const rows = await prisma.generation.groupBy({
-      by: ["type"],
-      where: { status: "SUCCEEDED", providerCostVnd: { not: null } },
-      _avg: { providerCostVnd: true },
-      _count: { _all: true },
-    });
-    await prisma.$disconnect();
+    const { db } = await import("../src/lib/supabase");
+    const { data } = await db
+      .from("generations")
+      .select("type,providerCostVnd")
+      .eq("status", "SUCCEEDED")
+      .not("providerCostVnd", "is", null);
+
+    if (!data?.length) return {};
+
+    // PostgREST không có GROUP BY/AVG — gộp ở đây. Số dòng có giới hạn nên ổn.
+    const bucket: Record<string, number[]> = {};
+    for (const r of data) {
+      if (r.providerCostVnd == null) continue;
+      (bucket[r.type] ??= []).push(r.providerCostVnd);
+    }
 
     const out: Record<string, Measured> = {};
-    for (const r of rows) {
-      if (r._avg.providerCostVnd == null) continue;
-      out[r.type] = {
-        costVnd: r._avg.providerCostVnd,
-        samples: r._count._all,
-        source: `đã chạy thật ${r._count._all} lần`,
+    for (const [type, xs] of Object.entries(bucket)) {
+      out[type] = {
+        costVnd: xs.reduce((a, b) => a + b, 0) / xs.length,
+        samples: xs.length,
+        source: "generations.providerCostVnd",
       };
     }
     return out;

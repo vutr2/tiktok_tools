@@ -7,11 +7,11 @@ import { useRouter } from "next/navigation";
 export default function AccountMenu({
   email,
   industryLabel,
-  balance,
+  status,
 }: {
   email: string;
   industryLabel: string | null;
-  balance: number;
+  status: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -62,7 +62,7 @@ export default function AccountMenu({
             <div className="truncate text-sm font-semibold">{email}</div>
             <div className="mt-1 space-y-0.5 text-xs text-muted">
               {industryLabel ? <div>Ngành: {industryLabel}</div> : null}
-              <div className="text-neon">Số dư: {balance} credit</div>
+              <div className="text-neon">{status}</div>
             </div>
           </div>
 
@@ -79,7 +79,7 @@ export default function AccountMenu({
               onClick={() => setOpen(false)}
               className="block rounded-xl px-3 py-2.5 transition hover:bg-raise"
             >
-              ◈ Ví credit của bạn
+              ◈ Gói của bạn
             </Link>
             <button
               onClick={signOut}

@@ -1,5 +1,10 @@
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db, unwrapOne } from "@/lib/supabase";
+import type { Database } from "@/lib/database.types";
+
+/** Object update dựng bằng spread làm inference của supabase-js gãy — khai
+ *  báo kiểu để không rơi về `never`. */
+type UserRow = Database["public"]["Tables"]["users"]["Row"];
 import { isIndustry } from "@/lib/industries";
 import { AppError } from "@/lib/errors";
 import { fail, ok } from "@/lib/http";
@@ -32,18 +37,24 @@ export async function PATCH(req: Request) {
     // PATCH: chỉ đụng vào trường CÓ trong body.
     // Trước đây `clean(undefined)` trả null nên một PATCH chỉ gửi {industry}
     // (đúng thứ màn chọn ngành gửi) sẽ xoá trắng tên và số điện thoại đã lưu.
-    const updated = await prisma.user.update({
-      where: { id: user.id },
-      data: {
+    const updated: UserRow = unwrapOne(
+      await db
+        .from("users")
+        .update({
         ...(body.name !== undefined
           ? { name: clean(body.name, MAX_NAME, "Tên") }
           : {}),
         ...(body.phone !== undefined
           ? { phone: clean(body.phone, MAX_PHONE, "Số điện thoại") }
           : {}),
-        ...(body.industry !== undefined ? { industry: body.industry } : {}),
-      },
-    });
+          ...(body.industry !== undefined ? { industry: body.industry } : {}),
+          updatedAt: new Date().toISOString(),
+        })
+        .eq("id", user.id)
+        .select("*")
+        .single(),
+      "cập nhật hồ sơ",
+    );
 
     return ok({
       id: updated.id,

@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/supabase";
 import {
   INDUSTRIES,
   INDUSTRY_EMOJI,
@@ -7,33 +7,47 @@ import {
   type Industry,
 } from "@/lib/industries";
 import { Card } from "@/components/ui";
+import { getEntitlement } from "@/lib/entitlement";
 import PageHeader from "@/components/page-header";
 import ProfileForm from "./form";
 
 export default async function ProfilePage() {
   const user = await requireUser();
+  const ent = await getEntitlement(user.id);
 
-  const [products, generations, spent] = await Promise.all([
-    prisma.product.count({ where: { userId: user.id } }),
-    prisma.generation.count({ where: { userId: user.id, status: "SUCCEEDED" } }),
-    prisma.creditTransaction.aggregate({
-      where: { userId: user.id, type: "DEBIT" },
-      _sum: { delta: true },
-    }),
+  // PostgREST: `head + count` chỉ trả số đếm, không kéo dòng về.
+  const [products, generations, debits] = await Promise.all([
+    db
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("userId", user.id),
+    db
+      .from("generations")
+      .select("id", { count: "exact", head: true })
+      .eq("userId", user.id)
+      .eq("status", "SUCCEEDED"),
+    // Không có SUM trong PostgREST — đọc delta rồi cộng ở đây.
+    db
+      .from("credit_transactions")
+      .select("delta")
+      .eq("userId", user.id)
+      .eq("type", "DEBIT"),
   ]);
 
+  const spentTotal = (debits.data ?? []).reduce((s, r) => s + r.delta, 0);
+
   const stats: [number, string][] = [
-    [products, "Sản phẩm"],
-    [generations, "Lần sinh xong"],
-    [Math.abs(spent._sum.delta ?? 0), "Credit đã dùng"],
+    [products.count ?? 0, "Sản phẩm"],
+    [generations.count ?? 0, "Lần sinh xong"],
+    [Math.abs(spentTotal), "Credit đã dùng"],
   ];
 
   return (
     <div className="max-w-2xl">
       <PageHeader
         title="Tôi"
-        balance={user.wallet?.balance ?? 0}
         plan={user.plan}
+        remaining={ent.remaining}
       />
 
       <div className="flex items-center gap-4">

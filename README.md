@@ -22,7 +22,7 @@ mua, cụm từ bị cấm, mẫu hook và bối cảnh ảnh đều khác nhau 
 ```bash
 cp .env.example .env       # dán 2 chuỗi kết nối Supabase + đặt AUTH_SECRET
 npm install
-npm run db:push            # dựng 6 bảng
+npm run types:db           # sinh kiểu TS từ database
 npm run dev
 ```
 
@@ -44,29 +44,22 @@ npm run economics # in bảng kinh tế đơn vị, exit 1 nếu chưa đo giá 
 
 ## Kinh tế đơn vị
 
-**Gói trọn đời $200** — trả một lần, dùng không giới hạn. Gói credit đã ngừng bán.
+**Không có credit.** Người dùng mới có **6 lượt sinh miễn phí** — đúng một sản
+phẩm trọn bộ (4 ảnh + mô tả + kịch bản) để xem thử kết quả. Hết lượt thì mua
+**gói trọn đời $200**, sau đó dùng không giới hạn.
 
-| | credit (chỉ áp dụng cho tài khoản FREE cũ) |
-|---|---|
-| 1 lần sinh text | 1 |
-| 1 ảnh (1 bối cảnh) | 5 |
+Quyền dùng đếm trực tiếp từ bảng `generations` (chỉ tính `SUCCEEDED`), xem
+`src/lib/entitlement.ts`. Không sổ cái, không transaction, không gì để trôi lệch
+— và lần gọi hỏng tự động không tính vào hạn mức.
 
-Giá vốn thật mỗi lần sinh vẫn không đổi khi bán trọn đời — nó chuyển sang mình
-chịu. Hoà vốn ở **~592 sản phẩm trọn bộ** mỗi người dùng; theo dõi bằng
-`generations.providerCostVnd`, xem `lifetimeBreakEven()` trong `src/lib/pricing.ts`.
-
-Ảnh sinh bằng Gemini image ("nano banana") — biên **79%** ở 5 credit. Chỗ lỗ là
-kịch bản video, không phải ảnh. Bảng so provider, cách đối soát giá thật và **hai
-việc cần quyết**: [`docs/unit-economics.md`](docs/unit-economics.md).
-
-Nguyên tắc: **trừ credit trước khi gọi API, hoàn lại nếu lỗi.** Cài ở
-`src/lib/generation.ts`, cả hai chiều đều idempotent.
+Mỗi người dùng thử tốn ~7.118đ giá vốn provider. Hoà vốn gói trọn đời ở ~592 sản
+phẩm, xem `lifetimeBreakEven()` trong `src/lib/pricing.ts`.
 
 ## Bản đồ code
 
 ```
-prisma/schema.prisma      12 bảng — 6 lõi nghiệp vụ + 6 vận hành
-prisma/rls.sql            ★ đóng REST API Supabase — CHẠY LẠI sau mỗi db:push
+supabase/schema.sql       12 bảng — 6 lõi nghiệp vụ + 6 vận hành
+supabase/rls.sql          ★ đóng REST API Supabase — CHẠY LẠI sau mỗi lần thêm bảng
 src/prompts/              ★ bộ prompt theo ngành — chỗ tạo khác biệt
   <ngành>.ts              giọng, nỗi lo, cụm cấm, hook, cảnh quay, 4 bối cảnh
   types.ts                kiểu PromptPack + lintClaims (hậu kiểm cụm cấm)

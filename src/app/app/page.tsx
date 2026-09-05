@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/supabase";
+import { pgDateRequired } from "@/lib/dates";
 import { publicUrl } from "@/lib/storage";
 import { INDUSTRY_LABEL, type Industry } from "@/lib/industries";
 import { buttonClass } from "@/components/ui";
+import { getEntitlement } from "@/lib/entitlement";
 import PageHeader from "@/components/page-header";
 
 /** Thời gian tương đối — người bán quan tâm "vừa xong" hơn là ngày giờ đầy đủ. */
@@ -20,18 +22,23 @@ function relativeTime(d: Date): string {
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const products = await prisma.product.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: 30,
-  });
+  const ent = await getEntitlement(user.id);
+  const products =
+    (
+      await db
+        .from("products")
+        .select("*")
+        .eq("userId", user.id)
+        .order("createdAt", { ascending: false })
+        .limit(30)
+    ).data ?? [];
 
   return (
     <div>
       <PageHeader
         title="Sản phẩm"
-        balance={user.wallet?.balance ?? 0}
         plan={user.plan}
+        remaining={ent.remaining}
       />
 
       {products.length === 0 ? (
@@ -77,7 +84,7 @@ export default async function Dashboard() {
                       {p.name}
                     </div>
                     <div className="mt-0.5 text-xs text-dim">
-                      {relativeTime(p.createdAt)}
+                      {relativeTime(pgDateRequired(p.createdAt))}
                     </div>
                   </div>
                 </Link>
