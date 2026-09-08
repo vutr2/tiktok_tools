@@ -1,15 +1,26 @@
+import "server-only";
+import { createHash, randomUUID } from "node:crypto";
+import { db } from "./supabase";
+
 /**
- * Lưu file ảnh.
+ * Lưu ảnh trên Supabase Storage.
  *
- * MVP ghi xuống đĩa local. Trước khi có người dùng thật phải đổi sang S3/R2 —
- * chỉ cần thay thân 3 hàm dưới, phần còn lại của app chỉ biết tới `key`.
+ * Trước đây ghi xuống đĩa (`./storage`). Trên Vercel hệ tập tin chỉ đọc nên
+ * upload chết `ENOENT /var/task`, và kể cả ghi được thì mỗi lần deploy là mất
+ * sạch ảnh.
+ *
+ * Bucket để RIÊNG TƯ. Trình duyệt xem ảnh bằng **signed URL** — đường dẫn có
+ * chữ ký, hết hạn sau một giờ. Ảnh đi thẳng từ CDN Supabase về máy người dùng,
+ * không chạy qua server Next, nên không tốn băng thông Vercel.
+ *
+ * Phần còn lại của app chỉ biết tới `key`. Đổi chỗ lưu lần nữa thì vẫn chỉ sửa
+ * trong file này.
  */
 
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+const BUCKET = process.env.SUPABASE_STORAGE_BUCKET?.trim() || "product-images";
 
-const ROOT = path.resolve(process.env.STORAGE_DIR ?? "./storage");
+/** Signed URL sống bao lâu. Trang render lại mỗi request nên không cần dài. */
+const SIGNED_URL_TTL = 60 * 60;
 
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 export const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
@@ -21,45 +32,89 @@ const EXT: Record<AllowedMime, string> = {
   "image/webp": "webp",
 };
 
-function safeKeyToPath(key: string): string {
-  // Chặn ../ — key đến từ URL.
-  const resolved = path.resolve(ROOT, key);
-  if (!resolved.startsWith(ROOT + path.sep)) {
-    throw new Error("Key không hợp lệ");
-  }
-  return resolved;
-}
-
 export async function putImage(args: {
   userId: string;
   data: Buffer;
   mime: AllowedMime;
   prefix?: string;
 }): Promise<string> {
-  const ext = EXT[args.mime];
-  const key = path.posix.join(
-    args.userId,
-    args.prefix ?? "raw",
-    `${randomUUID()}.${ext}`,
+  // Key bắt đầu bằng userId — vừa để phân vùng, vừa để soi log biết ảnh của ai.
+  const key = [args.userId, args.prefix ?? "raw", `${randomUUID()}.${EXT[args.mime]}`].join(
+    "/",
   );
-  const dest = safeKeyToPath(key);
-  await mkdir(path.dirname(dest), { recursive: true });
-  await writeFile(dest, args.data);
+
+  const { error } = await db.storage
+    .from(BUCKET)
+    .upload(key, args.data, { contentType: args.mime, upsert: false });
+
+  if (error) throw new Error(`Không lưu được ảnh: ${error.message}`);
   return key;
 }
 
+/**
+ * Đọc ảnh về dạng Buffer.
+ *
+ * Dùng phía server: tách nền cần đọc ảnh gốc, sinh mô tả cần gửi ảnh cho model.
+ * Trình duyệt thì dùng `signedUrl` chứ không đi đường này.
+ */
 export async function getImage(
   key: string,
 ): Promise<{ data: Buffer; mime: string }> {
-  const data = await readFile(safeKeyToPath(key));
-  const ext = path.extname(key).slice(1).toLowerCase();
-  const mime =
-    ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
-  return { data, mime };
+  const { data, error } = await db.storage.from(BUCKET).download(key);
+  if (error || !data) {
+    throw new Error(`Không đọc được ảnh ${key}: ${error?.message ?? "rỗng"}`);
+  }
+  return {
+    data: Buffer.from(await data.arrayBuffer()),
+    mime: data.type || mimeFromKey(key),
+  };
 }
 
-export function publicUrl(key: string): string {
-  return `/api/files/${key}`;
+/** Một signed URL. Cần nhiều thì dùng `signedUrls` — nó gộp thành một lần gọi. */
+export async function signedUrl(
+  key: string,
+  expiresIn = SIGNED_URL_TTL,
+): Promise<string | null> {
+  const { data, error } = await db.storage
+    .from(BUCKET)
+    .createSignedUrl(key, expiresIn);
+  return error ? null : (data?.signedUrl ?? null);
+}
+
+/**
+ * Ký nhiều key trong MỘT lần gọi.
+ *
+ * Lưới sản phẩm có N ảnh; ký từng cái là N lần gọi mạng nối tiếp nhau, trang
+ * chậm thấy rõ. Trả về Map để nơi gọi tra theo key.
+ */
+export async function signedUrls(
+  keys: string[],
+  expiresIn = SIGNED_URL_TTL,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const unique = [...new Set(keys.filter(Boolean))];
+  if (unique.length === 0) return out;
+
+  const { data, error } = await db.storage
+    .from(BUCKET)
+    .createSignedUrls(unique, expiresIn);
+  if (error || !data) return out;
+
+  for (const row of data) {
+    // `path` có thể null nếu key đó lỗi — bỏ qua, nơi gọi tự xử lý thiếu ảnh.
+    if (row.path && row.signedUrl) out.set(row.path, row.signedUrl);
+  }
+  return out;
+}
+
+export async function removeImages(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  await db.storage.from(BUCKET).remove(keys);
+}
+
+function mimeFromKey(key: string): string {
+  const ext = key.split(".").pop()?.toLowerCase();
+  return ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
 }
 
 export function checksum(data: Buffer): string {

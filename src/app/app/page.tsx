@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
 import { pgDateRequired } from "@/lib/dates";
-import { publicUrl } from "@/lib/storage";
+import { signedUrls } from "@/lib/storage";
 import { INDUSTRY_LABEL, type Industry } from "@/lib/industries";
 import { buttonClass } from "@/components/ui";
 import { getEntitlement } from "@/lib/entitlement";
@@ -32,6 +32,11 @@ export default async function Dashboard() {
         .order("createdAt", { ascending: false })
         .limit(30)
     ).data ?? [];
+
+  // Ký một lần cho cả lưới. Ký từng ảnh là N lần gọi mạng nối tiếp.
+  const urls = await signedUrls(
+    products.map((p) => p.cutoutImageKey ?? p.originalImageKey),
+  );
 
   return (
     <div>
@@ -70,7 +75,7 @@ export default async function Dashboard() {
                   <div className="relative overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={publicUrl(p.cutoutImageKey ?? p.originalImageKey)}
+                      src={urls.get(p.cutoutImageKey ?? p.originalImageKey) ?? ""}
                       alt={p.name}
                       className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105"
                     />

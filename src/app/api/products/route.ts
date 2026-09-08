@@ -4,7 +4,13 @@ import { newId } from "@/lib/ids";
 import { fail, ok } from "@/lib/http";
 import { AppError } from "@/lib/errors";
 import { isIndustry } from "@/lib/industries";
-import { MAX_UPLOAD_BYTES, isAllowedMime, putImage, publicUrl } from "@/lib/storage";
+import {
+  MAX_UPLOAD_BYTES,
+  isAllowedMime,
+  putImage,
+  signedUrl,
+  signedUrls,
+} from "@/lib/storage";
 
 export async function GET() {
   try {
@@ -18,15 +24,23 @@ export async function GET() {
           .order("createdAt", { ascending: false })
           .limit(50)
       ).data ?? [];
-    return ok(
-      products.map((p) => ({
-        id: p.id,
-        name: p.name,
-        industry: p.industry,
-        imageUrl: publicUrl(p.cutoutImageKey ?? p.originalImageKey),
-        createdAt: p.createdAt,
-      })),
-    );
+      // Ký một lần cho cả danh sách thay vì await bên trong map.
+      const urls = await signedUrls(
+        products.map((p) => p.cutoutImageKey ?? p.originalImageKey),
+      );
+
+      return ok(
+        products.map((p) => {
+          const key = p.cutoutImageKey ?? p.originalImageKey;
+          return {
+            id: p.id,
+            name: p.name,
+            industry: p.industry,
+            imageUrl: urls.get(key) ?? null,
+            createdAt: p.createdAt,
+          };
+        }),
+      );
   } catch (err) {
     return fail(err);
   }
@@ -88,7 +102,7 @@ export async function POST(req: Request) {
       "tạo sản phẩm",
     );
 
-    return ok({ id: product.id, imageUrl: publicUrl(key) }, 201);
+    return ok({ id: product.id, imageUrl: await signedUrl(key) }, 201);
   } catch (err) {
     return fail(err);
   }

@@ -15,7 +15,7 @@ import { getEntitlement, requireEntitlement } from "./entitlement";
 import { runGeneration } from "./generation";
 import { AppError } from "./errors";
 import { CREDIT_COST } from "./pricing";
-import { getImage, putImage, publicUrl, isAllowedMime } from "./storage";
+import { getImage, putImage, signedUrl, isAllowedMime } from "./storage";
 import { imageProvider } from "./ai/image";
 import {
   generateListingCopy,
@@ -154,7 +154,7 @@ export async function generateProductPhotos(args: {
             prefix: `scene/${sceneId}`,
           });
           return {
-            output: { key, url: publicUrl(key), sceneId },
+            output: { key, url: (await signedUrl(key)) ?? undefined, sceneId },
             providerCostVnd: image.costVnd,
             providerJobId: image.jobId,
           };

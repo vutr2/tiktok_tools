@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { assertSupabaseUrl, cleanEnv } from "./env-value";
 
 /**
  * Client Supabase phía server.
@@ -29,12 +30,26 @@ function missing(name: string): never {
   );
 }
 
+/**
+ * Đọc biến môi trường, bỏ dấu nháy bao quanh nếu có.
+ *
+ * File .env cho phép `KEY='giá trị'` và dotenv tự bỏ nháy. Ô Environment
+ * Variables trên Vercel thì KHÔNG — dán nguyên dòng từ .env vào đó là giá trị
+ * mang luôn hai dấu nháy, và SDK ném "Invalid supabaseUrl" mà không nói vì sao.
+ */
+export function envValue(name: string): string | undefined {
+  return cleanEnv(process.env[name]);
+}
+
 function create(): Db {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const url = envValue("NEXT_PUBLIC_SUPABASE_URL");
+  const key = envValue("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!url) missing("NEXT_PUBLIC_SUPABASE_URL");
   if (!key) missing("SUPABASE_SERVICE_ROLE_KEY");
+
+  // Kiểm trước khi đưa cho SDK: lỗi của SDK không nói giá trị sai chỗ nào.
+  assertSupabaseUrl(url);
 
   return createClient<Database>(url, key, {
     // Không có người dùng đăng nhập ở tầng Supabase — phiên do app tự quản

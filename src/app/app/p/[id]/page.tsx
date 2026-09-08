@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/supabase";
-import { publicUrl } from "@/lib/storage";
+import { signedUrls } from "@/lib/storage";
 import { allScenes } from "@/prompts";
 import { CREDIT_COST } from "@/lib/pricing";
 import { INDUSTRY_EMOJI, INDUSTRY_LABEL, type Industry } from "@/lib/industries";
@@ -26,6 +26,9 @@ export default async function ProductPage({
   if (!product) notFound();
 
   const industry = product.industry as Industry;
+
+  const thumbKey = product.cutoutImageKey ?? product.originalImageKey;
+  const urls = await signedUrls([thumbKey, product.originalImageKey]);
   const ent = await getEntitlement(user.id);
 
   return (
@@ -35,7 +38,7 @@ export default async function ProductPage({
       <div className="flex items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={publicUrl(product.cutoutImageKey ?? product.originalImageKey)}
+          src={urls.get(thumbKey) ?? ""}
           alt={product.name}
           className="h-14 w-14 shrink-0 rounded-xl bg-white object-cover"
         />
@@ -53,7 +56,7 @@ export default async function ProductPage({
       <Workbench
         productId={product.id}
         productName={product.name}
-        originalUrl={publicUrl(product.originalImageKey)}
+        originalUrl={urls.get(product.originalImageKey) ?? ""}
         scenes={allScenes(industry).map((s) => ({
           id: s.id,
           name: s.name,
