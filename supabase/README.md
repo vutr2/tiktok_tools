@@ -31,9 +31,17 @@ schema thì file có thể quên cập nhật, còn database thì không.
 Lúc chạy chỉ cần hai biến:
 
 ```
-NEXT_PUBLIC_SUPABASE_URL
+SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_STORAGE_BUCKET
 ```
+
+**Đừng đặt tên có tiền tố `NEXT_PUBLIC_`.** Next nướng cứng mọi tham chiếu tĩnh
+`process.env.NEXT_PUBLIC_X` vào lúc build; biến chưa có lúc build thì `undefined`
+bị đóng băng vĩnh viễn, đặt lại trên hosting cũng vô ích cho tới khi deploy lại.
+Cả ba biến trên chỉ dùng phía server nên không cần tiền tố.
+
+(`NEXT_PUBLIC_SUPABASE_URL` vẫn được chấp nhận để tương thích ngược.)
 
 `SUPABASE_SERVICE_ROLE_KEY` bỏ qua RLS — tương đương quyền role `postgres`.
 Nó chỉ được dùng phía server; `src/lib/supabase.ts` có `import "server-only"`

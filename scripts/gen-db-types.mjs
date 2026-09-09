@@ -11,12 +11,12 @@
 
 import { writeFileSync } from "node:fs";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+const url = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim();
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 if (!url || !key) {
   console.error(
-    "Thiếu NEXT_PUBLIC_SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY.\n" +
+    "Thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY.\n" +
       "Chạy qua: node --env-file=.env scripts/gen-db-types.mjs",
   );
   process.exit(1);

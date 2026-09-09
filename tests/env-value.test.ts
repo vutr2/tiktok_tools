@@ -36,8 +36,12 @@ describe("kiểm URL Supabase", () => {
   });
 
   it("thiếu giao thức thì chặn, và chỉ rõ cách sửa", () => {
-    expect(() => assertSupabaseUrl("abc.supabase.co")).toThrow(/DEPLOY LẠI/);
-    expect(() => assertSupabaseUrl("abc.supabase.co")).toThrow(/dấu nháy/);
+    const run = () => assertSupabaseUrl("abc.supabase.co");
+    expect(run).toThrow(/dấu nháy/);
+    // Thông báo phải cảnh báo về tiền tố NEXT_PUBLIC_: biến có tiền tố bị nướng
+    // cứng lúc build, đặt lại trên hosting cũng vô ích tới khi deploy lại.
+    expect(run).toThrow(/NEXT_PUBLIC_/);
+    expect(run).toThrow(/SUPABASE_URL/);
   });
 
   it("giao thức lạ thì chặn", () => {

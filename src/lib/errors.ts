@@ -10,19 +10,24 @@ export class AppError extends Error {
 }
 
 
-/** Hết lượt dùng thử. Không phải lỗi — là lúc mời mua gói. */
+/** Hết lượt. Không phải lỗi — là lúc mời mua gói. */
 export class TrialExhaustedError extends AppError {
   constructor(
-    public used: number,
-    public limit: number,
+    public usedToday: number,
+    public perDay: number,
+    /** true = hết hạn dùng thử; false = chỉ hết lượt hôm nay, mai lại có. */
+    public expired = false,
   ) {
     super(
       "TRIAL_EXHAUSTED",
-      `Bạn đã dùng hết ${limit} lượt miễn phí. Mua gói trọn đời để dùng không giới hạn.`,
+      expired
+        ? "Đã hết hạn dùng thử. Mua gói trọn đời để dùng không giới hạn."
+        : `Hôm nay đã dùng hết ${perDay} lượt miễn phí. Mai có lượt mới, hoặc mua gói trọn đời để dùng không giới hạn.`,
       402,
     );
   }
 }
+
 
 /** Lỗi từ provider ngoài. */
 export class ProviderError extends AppError {

@@ -6,7 +6,7 @@ import {
   INDUSTRY_EMOJI,
   INDUSTRY_LABEL,
 } from "@/lib/industries";
-import { FREE_TRIAL_GENERATIONS } from "@/lib/pricing";
+import { TRIAL_PER_DAY } from "@/lib/pricing";
 import { PlanPill } from "@/components/page-header";
 import IndustryPicker from "./picker";
 
@@ -25,7 +25,7 @@ export default async function Onboarding() {
     <main className="mx-auto min-h-svh max-w-md px-5 py-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Bắt đầu</h1>
-        <PlanPill plan={user.plan} remaining={FREE_TRIAL_GENERATIONS} />
+        <PlanPill plan={user.plan} remaining={TRIAL_PER_DAY} />
       </div>
 
       <h2 className="mt-6 text-2xl font-bold tracking-tight">

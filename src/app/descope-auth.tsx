@@ -145,7 +145,7 @@ export default function DescopeAuth({
       ) : null}
 
       <p className="mt-4 text-center text-xs text-dim">
-        Tài khoản mới có {bonusCredits} lượt dùng thử. Không cần thẻ.
+        Tài khoản mới được thử {bonusCredits} lượt mỗi ngày. Không cần thẻ.
       </p>
     </div>
   );

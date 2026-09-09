@@ -157,7 +157,7 @@ export default function SignInForm({
           {busy
             ? "Đang xử lý..."
             : mode === "register"
-              ? `Tạo tài khoản — ${bonusCredits} lượt miễn phí`
+              ? `Tạo tài khoản — thử ${bonusCredits} lượt/ngày`
               : "Vào studio"}
         </button>
       </form>

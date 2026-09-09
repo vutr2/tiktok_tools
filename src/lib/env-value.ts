@@ -34,9 +34,10 @@ export function assertSupabaseUrl(url: string): void {
 
 function badUrl(url: string): string {
   return (
-    `NEXT_PUBLIC_SUPABASE_URL không phải URL hợp lệ: ${JSON.stringify(url)}\n` +
+    `SUPABASE_URL không phải URL hợp lệ: ${JSON.stringify(url)}\n` +
     "  Phải có dạng https://<project-ref>.supabase.co\n" +
     "  • Trên Vercel: dán giá trị KHÔNG kèm dấu nháy — ô đó không tự bỏ nháy như file .env.\n" +
-    "  • NEXT_PUBLIC_ được nhúng cứng lúc build, nên sửa xong phải DEPLOY LẠI."
+    "  • Dùng tên SUPABASE_URL (không có tiền tố NEXT_PUBLIC_): biến có tiền tố\n" +
+    "    bị nướng cứng lúc build, đặt lại trên hosting cũng vô ích tới khi deploy lại."
   );
 }

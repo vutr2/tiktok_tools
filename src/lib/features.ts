@@ -20,6 +20,7 @@ import { imageProvider } from "./ai/image";
 import {
   generateListingCopy,
   generateVideoScripts,
+  textProvider,
   type ImageInput,
   type ListingCopy,
   type VideoScript,
@@ -205,7 +206,10 @@ export async function generateListing(args: {
     type: "LISTING_COPY",
     industry: product.industry,
     credits: CREDIT_COST.LISTING_COPY,
-    provider: "claude",
+    // Tên provider THẬT, không viết cứng. Trước đây chỗ này ghi cứng "claude"
+    // trong khi TEXT_PROVIDER=deepseek, nên generations.provider ghi sai — mà
+    // đó chính là cột dùng để đối chiếu chi phí từng nhà cung cấp.
+    provider: textProvider().name,
     input: { productId: product.id, info: productInfo(product) },
     run: async () => {
       const { output, costVnd } = await generateListingCopy({
@@ -245,7 +249,7 @@ export async function generateScripts(args: {
     type: "VIDEO_SCRIPT",
     industry: product.industry,
     credits: CREDIT_COST.VIDEO_SCRIPT,
-    provider: "claude",
+    provider: textProvider().name,
     input: { productId: product.id, info: productInfo(product) },
     run: async () => {
       const { output, costVnd } = await generateVideoScripts({

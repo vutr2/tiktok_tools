@@ -71,8 +71,8 @@ export function PlanPill({
       {lifetime
         ? "Trọn đời"
         : empty
-          ? "Hết lượt thử"
-          : `Còn ${remaining} lượt thử`}
+          ? "Hết lượt hôm nay"
+          : `Còn ${remaining} lượt hôm nay`}
     </Link>
   );
 }

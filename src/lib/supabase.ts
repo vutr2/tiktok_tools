@@ -42,10 +42,21 @@ export function envValue(name: string): string | undefined {
 }
 
 function create(): Db {
-  const url = envValue("NEXT_PUBLIC_SUPABASE_URL");
+  /**
+   * `SUPABASE_URL` trước, `NEXT_PUBLIC_SUPABASE_URL` chỉ để tương thích ngược.
+   *
+   * File này có `import "server-only"` — URL không bao giờ cần tới trình duyệt,
+   * nên tiền tố NEXT_PUBLIC_ vừa thừa vừa nguy hiểm: Next NƯỚNG CỨNG mọi tham
+   * chiếu tĩnh `process.env.NEXT_PUBLIC_X` vào lúc build. Biến chưa có lúc build
+   * thì giá trị `undefined` bị đóng băng vĩnh viễn, đặt lại trên hosting cũng vô
+   * ích cho tới khi deploy lại. Đó chính là lỗi "Invalid supabaseUrl".
+   *
+   * Biến không có tiền tố thì đọc lúc CHẠY, không có chuyện đóng băng.
+   */
+  const url = envValue("SUPABASE_URL") ?? envValue("NEXT_PUBLIC_SUPABASE_URL");
   const key = envValue("SUPABASE_SERVICE_ROLE_KEY");
 
-  if (!url) missing("NEXT_PUBLIC_SUPABASE_URL");
+  if (!url) missing("SUPABASE_URL");
   if (!key) missing("SUPABASE_SERVICE_ROLE_KEY");
 
   // Kiểm trước khi đưa cho SDK: lỗi của SDK không nói giá trị sai chỗ nào.

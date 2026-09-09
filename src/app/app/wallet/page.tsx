@@ -49,28 +49,40 @@ export default async function WalletPage() {
         </div>
       ) : (
         <>
-          {/* Lượt thử còn lại — thanh này là thứ khiến người bán quyết định mua */}
+          {/* Lượt hôm nay + số ngày còn lại — thứ khiến người bán quyết định mua */}
           <Card className={ent.remaining <= 0 ? "border-brand" : ""}>
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-sm font-semibold">
-                {ent.remaining > 0 ? "Lượt dùng thử" : "Đã hết lượt dùng thử"}
+                {ent.expired
+                  ? "Đã hết hạn dùng thử"
+                  : ent.remaining > 0
+                    ? "Lượt dùng thử hôm nay"
+                    : "Hôm nay đã hết lượt"}
               </span>
               <span className="text-sm tabular-nums text-muted">
-                {ent.used}/{ent.limit}
+                {ent.usedToday}/{ent.perDay}
               </span>
             </div>
-            <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-raise">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-brand to-neon"
-                style={{
-                  width: `${Math.min(100, (ent.used / ent.limit) * 100)}%`,
-                }}
-              />
+
+            <div className="mt-2.5 flex gap-1.5">
+              {Array.from({ length: ent.perDay }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-2 flex-1 rounded-full ${
+                    i < ent.usedToday
+                      ? "bg-gradient-to-r from-brand to-neon"
+                      : "bg-raise"
+                  }`}
+                />
+              ))}
             </div>
+
             <p className="mt-2.5 text-xs text-muted">
-              {ent.remaining > 0
-                ? `Còn ${ent.remaining} lượt. Đủ dựng trọn vẹn một sản phẩm để xem thử kết quả.`
-                : "Mua gói trọn đời để tiếp tục dùng không giới hạn."}
+              {ent.expired
+                ? "Mua gói trọn đời để tiếp tục dùng không giới hạn."
+                : ent.remaining > 0
+                  ? `Còn ${ent.remaining} lượt hôm nay · còn ${ent.daysLeft} ngày dùng thử.`
+                  : `Mai có ${ent.perDay} lượt mới · còn ${ent.daysLeft} ngày dùng thử.`}
             </p>
           </Card>
 

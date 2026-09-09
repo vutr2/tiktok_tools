@@ -17,9 +17,11 @@ export async function GET() {
     return ok({
       plan: user.plan,
       unlimited: e.unlimited,
-      used: e.used,
-      limit: e.limit,
+      usedToday: e.usedToday,
+      perDay: e.perDay,
       remaining: e.unlimited ? null : e.remaining,
+      daysLeft: e.unlimited ? null : e.daysLeft,
+      expired: e.expired,
       lifetime: {
         id: LIFETIME_PLAN.id,
         name: LIFETIME_PLAN.name,

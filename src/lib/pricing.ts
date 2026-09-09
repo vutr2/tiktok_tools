@@ -99,17 +99,25 @@ export const LIFETIME_PLAN = {
 } as const;
 
 /**
- * Số lần sinh miễn phí trước khi phải mua gói trọn đời.
+ * Dùng thử: 3 ngày, mỗi ngày 3 lượt.
  *
- * 6 = đúng một sản phẩm trọn bộ (4 ảnh + mô tả + kịch bản). Người bán thử được
- * trọn vẹn một lần rồi mới quyết định — không phải đoán mò.
+ * Khác hẳn một cục 6 lượt dùng lúc nào cũng được. Chia theo ngày buộc người bán
+ * quay lại — ngày 1 dựng thử một sản phẩm, ngày 2 quay lại làm sản phẩm thật.
+ * Ai định vét sạch trong một buổi cũng không vét được.
  *
- * Mỗi người dùng thử tốn của mình ~7.118đ (4 ảnh × 1.762đ + 2 lần text × 35đ).
- * Tăng con số này là tăng thẳng chi phí thu hút người dùng.
+ * Tối đa 9 lượt trong 3 ngày, tốn của mình ~15.900đ mỗi người thử (nếu dùng hết
+ * bằng ảnh). Sửa hai số này là sửa thẳng chi phí thu hút người dùng.
  */
-export const FREE_TRIAL_GENERATIONS = Number(
-  process.env.FREE_TRIAL_GENERATIONS ?? 6,
-);
+export const TRIAL_DAYS = Number(process.env.TRIAL_DAYS ?? 3);
+export const TRIAL_PER_DAY = Number(process.env.TRIAL_PER_DAY ?? 3);
+
+/**
+ * Múi giờ tính "một ngày".
+ *
+ * Người bán ở Việt Nam nghĩ "hôm nay" theo giờ VN; database lưu UTC. Lấy nhầm
+ * là hạn mức reset lúc 7 giờ sáng thay vì nửa đêm — âm thầm, không ai báo lỗi.
+ */
+export const TRIAL_TIMEZONE = process.env.TRIAL_TIMEZONE ?? "Asia/Ho_Chi_Minh";
 
 export function lifetimePriceVnd(): number {
   return Math.round(usdToVnd(LIFETIME_PLAN.priceUsd));

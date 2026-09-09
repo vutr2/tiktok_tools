@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { currentUserId } from "@/lib/auth";
 import { INDUSTRIES, INDUSTRY_EMOJI, INDUSTRY_LABEL } from "@/lib/industries";
-import { FREE_TRIAL_GENERATIONS, LIFETIME_PLAN } from "@/lib/pricing";
+import { LIFETIME_PLAN, TRIAL_DAYS, TRIAL_PER_DAY } from "@/lib/pricing";
 import {
   descopeBaseUrl,
   descopeEnabled,
@@ -32,7 +32,7 @@ const STEPS: [string, string, string][] = [
 export default async function Home() {
   if (await currentUserId()) redirect("/app");
 
-  const bonus = FREE_TRIAL_GENERATIONS;
+  const bonus = TRIAL_PER_DAY;
 
   return (
     <main>
@@ -120,8 +120,10 @@ export default async function Home() {
           <div className="font-semibold">Tính tiền thế nào</div>
           <ul className="mt-3 space-y-1.5 text-sm text-muted">
             <li>
-              <span className="text-ink">{bonus} lượt miễn phí</span> — đủ dựng
-              trọn vẹn một sản phẩm để xem thử kết quả.
+              <span className="text-ink">
+                Dùng thử {TRIAL_DAYS} ngày, mỗi ngày {TRIAL_PER_DAY} lượt
+              </span>{" "}
+              — không cần thẻ, không tự động gia hạn.
             </li>
             <li>
               <span className="text-ink">${LIFETIME_PLAN.priceUsd} trả một lần</span>{" "}
