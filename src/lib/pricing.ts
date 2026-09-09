@@ -5,6 +5,8 @@
  * credit thì sửa đúng file này, rồi chạy `npm run economics` để xem biên còn lại.
  */
 
+import { envNumberOr } from "./env-value";
+
 export type GenerationKind = "PRODUCT_PHOTO" | "LISTING_COPY" | "VIDEO_SCRIPT";
 
 /**
@@ -108,8 +110,10 @@ export const LIFETIME_PLAN = {
  * Tối đa 9 lượt trong 3 ngày, tốn của mình ~15.900đ mỗi người thử (nếu dùng hết
  * bằng ảnh). Sửa hai số này là sửa thẳng chi phí thu hút người dùng.
  */
-export const TRIAL_DAYS = Number(process.env.TRIAL_DAYS ?? 3);
-export const TRIAL_PER_DAY = Number(process.env.TRIAL_PER_DAY ?? 3);
+// min: 0 — đặt 0 là cố ý tắt dùng thử, hợp lệ. Biến RỖNG mới là thứ phải chặn:
+// nó cũng cho ra 0, nhưng do sơ suất cấu hình chứ không phải chủ ý.
+export const TRIAL_DAYS = envNumberOr(process.env.TRIAL_DAYS, 3, { min: 0 });
+export const TRIAL_PER_DAY = envNumberOr(process.env.TRIAL_PER_DAY, 3, { min: 0 });
 
 /**
  * Múi giờ tính "một ngày".
@@ -162,7 +166,9 @@ export const CLAUDE_TOKEN_PRICE_USD_PER_MTOK = {
 export type ClaudeModelId = keyof typeof CLAUDE_TOKEN_PRICE_USD_PER_MTOK;
 
 export function usdToVnd(usd: number): number {
-  const rate = Number(process.env.USD_VND ?? 26_300);
+  // min: 1 — tỉ giá dưới 1 là vô nghĩa. Đây là chỗ từng làm gói $200 hiện "≈ 0đ"
+  // khi biến USD_VND trên hosting được đặt thành chuỗi rỗng.
+  const rate = envNumberOr(process.env.USD_VND, 26_300, { min: 1 });
   return usd * rate;
 }
 

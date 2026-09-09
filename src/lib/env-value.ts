@@ -19,6 +19,34 @@ export function cleanEnv(raw: string | undefined): string | undefined {
   return unquoted || undefined;
 }
 
+/**
+ * Đọc biến môi trường dạng số, có giá trị mặc định.
+ *
+ * Đừng viết `Number(process.env.X ?? mặc_định)`. `??` chỉ nhảy sang mặc định
+ * khi biến là `undefined`; biến CÓ MẶT nhưng RỖNG thì không nhảy, và
+ * `Number("")` bằng 0. Không có lỗi, không có cảnh báo — chỉ là tỉ giá 0 khiến
+ * gói $200 hiện ra "≈ 0đ", hoặc TRIAL_DAYS bằng 0 khiến mọi người dùng hết hạn
+ * dùng thử ngay lúc đăng ký.
+ *
+ * Còn nguyên dấu nháy (bẫy của ô Environment Variables trên Vercel) thì
+ * `Number('"26300"')` ra NaN — `cleanEnv` lo phần đó.
+ *
+ * Giá trị trống, không phải số, hoặc nhỏ hơn `min` đều bị coi như KHÔNG ĐẶT.
+ */
+export function envNumberOr(
+  raw: string | undefined,
+  fallback: number,
+  { min }: { min?: number } = {},
+): number {
+  const cleaned = cleanEnv(raw);
+  if (cleaned === undefined) return fallback;
+
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return fallback;
+  if (min !== undefined && n < min) return fallback;
+  return n;
+}
+
 /** Ném lỗi nói rõ sai chỗ nào, thay vì để SDK ném một câu không dùng được. */
 export function assertSupabaseUrl(url: string): void {
   let parsed: URL;

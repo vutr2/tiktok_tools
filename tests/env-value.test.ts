@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSupabaseUrl, cleanEnv } from "@/lib/env-value";
+import { assertSupabaseUrl, cleanEnv, envNumberOr } from "@/lib/env-value";
 
 describe("bỏ dấu nháy quanh giá trị", () => {
   it("nháy đơn — đúng lỗi đã gặp trên Vercel", () => {
@@ -52,5 +52,63 @@ describe("kiểm URL Supabase", () => {
     expect(() => assertSupabaseUrl("'https://abc.supabase.co'")).toThrow(
       /'https:\/\/abc\.supabase\.co'/,
     );
+  });
+});
+
+describe("envNumberOr — biến số rỗng không được thành 0", () => {
+  it("không đặt thì dùng mặc định", () => {
+    expect(envNumberOr(undefined, 26_300)).toBe(26_300);
+  });
+
+  it("RỖNG cũng dùng mặc định — đây là lỗi đã làm gói $200 hiện '≈ 0đ'", () => {
+    // `Number(process.env.X ?? 26300)` cho ra 0 ở đây: `??` không nhảy vì biến
+    // có mặt, và Number("") = 0.
+    // Cách viết cũ, để đối chứng. Phải đi qua biến: viết thẳng `"" ?? 26300`
+    // thì TypeScript biết vế trái không bao giờ nullish và chặn ngay.
+    const raw: string | undefined = "";
+    expect(Number(raw ?? 26_300)).toBe(0);
+    expect(envNumberOr("", 26_300)).toBe(26_300);
+  });
+
+  it("chỉ có khoảng trắng cũng vậy", () => {
+    expect(envNumberOr("   ", 26_300)).toBe(26_300);
+  });
+
+  it("còn nguyên dấu nháy vẫn đọc được — bẫy ô Environment Variables của Vercel", () => {
+    expect(Number('"26300"')).toBeNaN(); // cách viết cũ
+    expect(envNumberOr('"26300"', 1)).toBe(26_300);
+    expect(envNumberOr("'26300'", 1)).toBe(26_300);
+  });
+
+  it("không phải số thì dùng mặc định thay vì trả NaN", () => {
+    expect(envNumberOr("hai mươi sáu nghìn", 26_300)).toBe(26_300);
+    expect(envNumberOr("NaN", 26_300)).toBe(26_300);
+  });
+
+  it("Infinity không phải giá trị dùng được", () => {
+    expect(envNumberOr("Infinity", 26_300)).toBe(26_300);
+  });
+
+  it("giá trị hợp lệ thì tôn trọng, kể cả số thập phân", () => {
+    expect(envNumberOr("25000", 26_300)).toBe(25_000);
+    expect(envNumberOr(" 25000.5 ", 26_300)).toBe(25_000.5);
+  });
+
+  it("min chặn giá trị vô nghĩa nhưng vẫn cho phép 0 khi 0 là cố ý", () => {
+    // Tỉ giá: dưới 1 là vô nghĩa.
+    expect(envNumberOr("0", 26_300, { min: 1 })).toBe(26_300);
+    expect(envNumberOr("-5", 26_300, { min: 1 })).toBe(26_300);
+    // Số ngày dùng thử: đặt 0 là cố ý tắt dùng thử, phải giữ nguyên.
+    expect(envNumberOr("0", 3, { min: 0 })).toBe(0);
+  });
+});
+
+describe("giá gói không bao giờ được ra 0", () => {
+  const rate = (raw: string | undefined) => envNumberOr(raw, 26_300, { min: 1 });
+
+  it("mọi kiểu cấu hình hỏng đều vẫn ra giá dương", () => {
+    for (const bad of [undefined, "", "  ", '"26300"', "abc", "0", "-1"]) {
+      expect(200 * rate(bad)).toBeGreaterThan(0);
+    }
   });
 });
