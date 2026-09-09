@@ -107,9 +107,23 @@ export async function signedUrls(
   return out;
 }
 
-export async function removeImages(keys: string[]): Promise<void> {
-  if (keys.length === 0) return;
-  await db.storage.from(BUCKET).remove(keys);
+/**
+ * Xoá ảnh khỏi bucket.
+ *
+ * Trả về kết quả THẬT chứ không nuốt lỗi. Xoá sản phẩm là để giải phóng dung
+ * lượng — nếu Storage từ chối mà hàm này im lặng thì người dùng tưởng đã dọn
+ * sạch trong khi tiền lưu trữ vẫn chạy. Không ném lỗi: dòng trong database đã
+ * xoá rồi, ném ở đây chỉ làm hỏng một thao tác đã thành công một nửa.
+ */
+export async function removeImages(
+  keys: string[],
+): Promise<{ removed: number; error: string | null }> {
+  const unique = [...new Set(keys.filter(Boolean))];
+  if (unique.length === 0) return { removed: 0, error: null };
+
+  const { data, error } = await db.storage.from(BUCKET).remove(unique);
+  if (error) return { removed: 0, error: error.message };
+  return { removed: data?.length ?? 0, error: null };
 }
 
 function mimeFromKey(key: string): string {

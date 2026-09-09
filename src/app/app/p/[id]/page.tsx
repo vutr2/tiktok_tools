@@ -8,6 +8,7 @@ import { INDUSTRY_EMOJI, INDUSTRY_LABEL, type Industry } from "@/lib/industries"
 import { getEntitlement } from "@/lib/entitlement";
 import PageHeader, { PlanPill } from "@/components/page-header";
 import Workbench from "./workbench";
+import DeleteProduct from "./delete-product";
 
 export default async function ProductPage({
   params,
@@ -67,6 +68,8 @@ export default async function ProductPage({
         remaining={ent.remaining}
         lifetime={user.plan === "LIFETIME"}
       />
+
+      <DeleteProduct productId={product.id} productName={product.name} />
     </div>
   );
 }
