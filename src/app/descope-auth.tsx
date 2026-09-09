@@ -101,7 +101,10 @@ export default function DescopeAuth({
         body?.error?.message ?? "Xác thực xong nhưng không vào được app.",
       );
     }
-    router.replace(body.needsIndustry ? "/app/onboarding" : "/app");
+    // "/onboarding", KHÔNG phải "/app/onboarding". Thư mục là src/app/onboarding
+    // — cùng cấp với app/, không nằm trong nó. Đưa nhầm là người dùng vừa đăng
+    // nhập xong đã đâm thẳng vào trang 404.
+    router.replace(body.needsIndustry ? "/onboarding" : "/app");
     router.refresh();
   }
 

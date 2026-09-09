@@ -134,7 +134,7 @@ export async function signIn(
  * tự khai.
  *
  * `industry` để trống có chủ đích — Descope không biết ngành hàng, app hỏi ở
- * bước sau (`/app/onboarding`). Ép hỏi trước sẽ vỡ khi flow là magic link mở ở
+ * bước sau (`/onboarding`). Ép hỏi trước sẽ vỡ khi flow là magic link mở ở
  * tab khác.
  */
 export async function signInVerified(identity: {
