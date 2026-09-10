@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import MetaPixel from "@/components/meta-pixel";
+<<<<<<< HEAD
 import { cleanEnv } from "@/lib/env-value";
+=======
+>>>>>>> refs/remotes/origin/claude/mvp-scope-3-features-q0v5gz
 
 /**
  * Be Vietnam Pro — font do người Việt dựng, có đủ bộ dấu.
@@ -27,6 +30,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+<<<<<<< HEAD
   /**
    * Đọc ở đây — layout là Server Component nên biến được đọc lúc CHẠY.
    *
@@ -38,12 +42,25 @@ export default function RootLayout({
    * client không có gì phải giấu.
    */
   const pixelId = cleanEnv(process.env.META_PIXEL_ID) ?? "";
+=======
+  // Chỉ bắn ở production. Chạy `next dev` mà vẫn đẩy dữ liệu vào pixel thật là
+  // tự làm bẩn số liệu quảng cáo bằng chính traffic của mình.
+  const pixelId =
+    process.env.NODE_ENV === "production"
+      ? process.env.NEXT_PUBLIC_META_PIXEL_ID
+      : undefined;
+>>>>>>> refs/remotes/origin/claude/mvp-scope-3-features-q0v5gz
 
   return (
     <html lang="vi" className={beVietnam.variable}>
       <body className="min-h-screen bg-canvas text-ink antialiased">
+<<<<<<< HEAD
         <MetaPixel pixelId={pixelId} />
         {children}
+=======
+        {children}
+        {pixelId ? <MetaPixel pixelId={pixelId} /> : null}
+>>>>>>> refs/remotes/origin/claude/mvp-scope-3-features-q0v5gz
       </body>
     </html>
   );

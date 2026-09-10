@@ -36,6 +36,12 @@ tốn tiền — toàn bộ luồng trừ credit / hoàn credit / lưu file / hi
 chỉ có ảnh trả về là ảnh gốc. Sinh ảnh thật cần `GEMINI_API_KEY` +
 `IMAGE_PROVIDER=gemini`; sinh text cần `ANTHROPIC_API_KEY`.
 
+**Meta Pixel** — đặt `NEXT_PUBLIC_META_PIXEL_ID=27915661228125492`. Chỉ bắn khi
+`NODE_ENV=production`, nên `npm run dev` không đẩy traffic của mình vào số liệu
+quảng cáo. Biến `NEXT_PUBLIC_*` được nhúng vào bundle lúc **build**, không phải
+lúc chạy: đổi pixel thì phải build lại, và biến đó phải có mặt trong môi trường
+build của bên deploy chứ không chỉ ở runtime.
+
 ```bash
 npm test          # 90 test, không cần DB
 npm run typecheck
