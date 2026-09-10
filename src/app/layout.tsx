@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
+import MetaPixel from "@/components/meta-pixel";
 
 /**
  * Be Vietnam Pro — font do người Việt dựng, có đủ bộ dấu.
@@ -25,9 +26,19 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Chỉ bắn ở production. Chạy `next dev` mà vẫn đẩy dữ liệu vào pixel thật là
+  // tự làm bẩn số liệu quảng cáo bằng chính traffic của mình.
+  const pixelId =
+    process.env.NODE_ENV === "production"
+      ? process.env.NEXT_PUBLIC_META_PIXEL_ID
+      : undefined;
+
   return (
     <html lang="vi" className={beVietnam.variable}>
-      <body className="min-h-screen bg-canvas text-ink antialiased">{children}</body>
+      <body className="min-h-screen bg-canvas text-ink antialiased">
+        {children}
+        {pixelId ? <MetaPixel pixelId={pixelId} /> : null}
+      </body>
     </html>
   );
 }
