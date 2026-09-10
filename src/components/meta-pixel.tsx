@@ -4,7 +4,6 @@ import Script from "next/script";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
-<<<<<<< HEAD
 /**
  * Meta Pixel (Facebook Pixel).
  *
@@ -18,24 +17,19 @@ import { useEffect, useRef } from "react";
  *    /app rồi /app/wallet mà Meta chỉ thấy một lượt xem. Nên phải tự bắn thêm
  *    mỗi lần đổi đường dẫn.
  *
- * 3. ID đọc từ biến môi trường, và truyền từ layout (Server Component) xuống.
- *    KHÔNG dùng `process.env.NEXT_PUBLIC_...` trực tiếp ở đây: biến có tiền tố
- *    đó bị nướng cứng lúc build, chưa đặt lúc build là đóng băng `undefined`
- *    vĩnh viễn — đúng cái bẫy đã gây lỗi `Invalid supabaseUrl` trước đây.
+ * 3. ID nhận qua prop từ layout (Server Component), không đọc `process.env`
+ *    ngay tại đây. Layout quyết định khi nào bật, chỗ này chỉ lo phần chạy.
  *
- * Không có ID thì không render gì. Máy cá nhân sẽ không bắn dữ liệu rác vào
- * tài khoản quảng cáo — số liệu bẩn còn tệ hơn không có số liệu.
+ * Không có ID thì không render gì — máy cá nhân sẽ không bắn dữ liệu rác vào
+ * tài khoản quảng cáo. Số liệu bẩn còn tệ hơn không có số liệu.
  */
 
-=======
->>>>>>> refs/remotes/origin/claude/mvp-scope-3-features-q0v5gz
 declare global {
   interface Window {
     fbq?: (...args: unknown[]) => void;
   }
 }
 
-<<<<<<< HEAD
 export default function MetaPixel({ pixelId }: { pixelId: string }) {
   const pathname = usePathname();
   // Lượt đầu do chính đoạn script bên dưới bắn. Không chặn thì Meta nhận hai
@@ -52,28 +46,6 @@ export default function MetaPixel({ pixelId }: { pixelId: string }) {
   }, [pathname, pixelId]);
 
   if (!pixelId) return null;
-=======
-/**
- * Meta Pixel.
- *
- * Đoạn script gốc của Meta chỉ bắn PageView một lần lúc tải trang. App này là
- * SPA — bấm từ /app sang /app/wallet không tải lại trang, nên nếu dán y nguyên
- * đoạn của Meta thì mọi lượt xem sau lần đầu đều không được tính. `useEffect`
- * theo `pathname` bên dưới bù đúng chỗ đó.
- */
-export default function MetaPixel({ pixelId }: { pixelId: string }) {
-  const pathname = usePathname();
-  const isFirstRender = useRef(true);
-
-  useEffect(() => {
-    // Lần đầu đã có PageView từ chính đoạn script gốc — bắn thêm là đếm hai lần.
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    window.fbq?.("track", "PageView");
-  }, [pathname]);
->>>>>>> refs/remotes/origin/claude/mvp-scope-3-features-q0v5gz
 
   return (
     <>
@@ -89,29 +61,19 @@ s.parentNode.insertBefore(t,s)}(window, document,'script',
 fbq('init', '${pixelId}');
 fbq('track', 'PageView');`}
       </Script>
-<<<<<<< HEAD
-=======
-
->>>>>>> refs/remotes/origin/claude/mvp-scope-3-features-q0v5gz
       <noscript>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           height="1"
           width="1"
           style={{ display: "none" }}
-<<<<<<< HEAD
           alt=""
           src={`https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`}
-=======
-          src={`https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`}
-          alt=""
->>>>>>> refs/remotes/origin/claude/mvp-scope-3-features-q0v5gz
         />
       </noscript>
     </>
   );
 }
-<<<<<<< HEAD
 
 /**
  * Bắn một sự kiện chuẩn của Meta từ bất kỳ đâu trong app.
@@ -123,5 +85,3 @@ export function trackEvent(name: string, params?: Record<string, unknown>) {
   if (typeof window === "undefined") return;
   window.fbq?.("track", name, params);
 }
-=======
->>>>>>> refs/remotes/origin/claude/mvp-scope-3-features-q0v5gz
